@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .common import (
     DocumentType,
     InstrumentStrength,
+    Money,
     SecurityType,
     instrument_strength_of,
 )
@@ -71,6 +73,56 @@ class CustodyStatus(StrEnum):
     NOT_RECEIVED = "not_received"
     RELEASED = "released"
     UNKNOWN = "unknown"
+
+
+class TransactionType(StrEnum):
+    """Whether this is a first purchase or a loan against already-owned property.
+
+    Gates Annex XIV 1.9, which applies to "financing of any initial transaction of the
+    purchase of a property". A LAP against inherited property is not an initial purchase
+    and the documented-transaction-value cap does not arise.
+    """
+
+    INITIAL_PURCHASE = "initial_purchase"
+    RESALE_PURCHASE = "resale_purchase"
+    LOAN_AGAINST_OWNED_PROPERTY = "loan_against_owned_property"
+    UNKNOWN = "unknown"
+
+
+class LoanTerms(BaseModel):
+    """The lending side of the case. Needed by the LTV requirements.
+
+    `total_outstanding` is distinct from `sanctioned_amount` because
+    REQ_HFC_19_1_LTV_COMPUTATION puts "principal + accrued interest + other charges
+    pertaining to the loan, without any netting" in the LTV numerator - not the sanctioned
+    principal. Using the wrong one understates LTV.
+    """
+
+    model_config = ConfigDict(frozen=False)
+
+    sanctioned_amount: Money | None = None
+    total_outstanding: Money | None = None
+
+    #: Denominator of the LTV ratio: realizable value of the mortgaged property.
+    property_value_for_ltv: Money | None = None
+
+    #: Excluded from the property cost per REQ_HFC_19_1_LTV_COMPUTATION - except where
+    #: the house cost does not exceed Rs.10 lakh, when they MAY be added.
+    stamp_duty: Money | None = None
+    registration_charges: Money | None = None
+
+    transaction_type: TransactionType = TransactionType.UNKNOWN
+
+    def ltv_numerator(self) -> Money | None:
+        """Total outstanding, falling back to sanctioned amount only if that is all we have."""
+        return self.total_outstanding or self.sanctioned_amount
+
+    def ltv_percent(self) -> Decimal | None:
+        num = self.ltv_numerator()
+        den = self.property_value_for_ltv
+        if num is None or den is None or den.paise == 0:
+            return None
+        return (Decimal(num.paise) / Decimal(den.paise) * 100).quantize(Decimal("0.01"))
 
 
 class Document(BaseModel):
@@ -131,6 +183,8 @@ class Case(BaseModel):
     #: Security type gates TPA s.59. Defaults to UNKNOWN, never to a guess - asserting a
     #: registration defect without knowing the security type would be a false positive.
     security_type: SecurityType = SecurityType.UNKNOWN
+
+    loan: LoanTerms = Field(default_factory=LoanTerms)
 
     documents: list[Document] = Field(default_factory=list)
     properties: list[Property] = Field(default_factory=list)

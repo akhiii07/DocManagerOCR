@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ROOT / "docs/regulatory/sources.yaml"
 REQUIREMENTS = ROOT / "docs/regulatory/requirements.yaml"
+RULES_DIR = ROOT / "rules"
 
 # A requirement may only be PROMOTED TO A RULE if its source is verified.
 RULE_READY_STATUS = "PRIMARY_VERIFIED"
@@ -117,6 +118,45 @@ def main() -> int:
         for f in sorted(graded - present):
             warn(f"provenance entry for {f}, but the file is not in sources/")
 
+    # --- rules: citations must resolve, and APPROVED rules must be well-founded ---
+    req_by_id = {r["id"]: r for r in requirements}
+    rule_count = approved_count = business_rule_count = 0
+
+    for rules_file in sorted(RULES_DIR.glob("*.yaml")) if RULES_DIR.is_dir() else []:
+        rs = load(rules_file)
+        for rule in rs.get("rules", []) or []:
+            rule_count += 1
+            rid = rule.get("rule_id", "<no id>")
+            status = rule.get("status", "DRAFT")
+            citations = rule.get("citations") or []
+
+            if not citations:
+                business_rule_count += 1
+
+            for cit in citations:
+                if cit not in req_by_id:
+                    err(f"rule {rid}: citation {cit} does not resolve to a requirement")
+                    continue
+                req = req_by_id[cit]
+                inst = instruments.get(req.get("source"), {})
+                if status == "APPROVED":
+                    if inst.get("verification_status") != RULE_READY_STATUS:
+                        err(
+                            f"rule {rid} is APPROVED but cites {cit}, whose source "
+                            f"{inst.get('id')} is {inst.get('verification_status')}. "
+                            f"An approved rule must rest on a verified source."
+                        )
+                    if req.get("status") == "REQUIRES_LEGAL_REVIEW":
+                        err(
+                            f"rule {rid} is APPROVED but cites {cit}, which is "
+                            f"REQUIRES_LEGAL_REVIEW."
+                        )
+
+            if status == "APPROVED":
+                approved_count += 1
+                if not rule.get("legal_signoff"):
+                    err(f"rule {rid} is APPROVED without legal_signoff.")
+
     # --- report -----------------------------------------------------------------
     verified = sum(1 for i in instruments.values()
                    if i.get("verification_status") == RULE_READY_STATUS)
@@ -131,6 +171,10 @@ def main() -> int:
     print(f"  rule-ready       : {rule_ready}")
     print(f"  blocked          : {len(requirements) - rule_ready}")
     print(f"negative findings  : {len(negatives)}")
+    print(f"rules              : {rule_count}")
+    print(f"  approved         : {approved_count}")
+    print(f"  regulatory       : {rule_count - business_rule_count}")
+    print(f"  business rules   : {business_rule_count}")
 
     if warnings:
         print(f"\n{len(warnings)} warning(s):")

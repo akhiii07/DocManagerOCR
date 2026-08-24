@@ -186,6 +186,46 @@ blocked. See [OPEN-ITEMS.md](OPEN-ITEMS.md).
 
 ---
 
+## ADR-0009 — Rules are YAML policy + named Python predicates, not an expression language
+**Date:** 2026-08-24 · **Status:** Accepted · **Supersedes part of:** technology direction (CEL)
+
+**Decision.** Rule specs live in `rules/*.yaml` carrying policy — applicability, severity,
+determinacy, citations, message, sign-off. The `check` field names a **registered Python
+predicate** that performs the computation. No embedded expression language for now.
+
+**Why.** The earlier direction proposed CEL for rule conditions. On implementing the real
+checks, the conditions turned out not to be one-line comparisons: comparing claim sets with
+tolerance *and* measurement basis, filtering by instrument strength, applying the TPA s.59
+carve-out. In CEL these would either be unreadable or would need so many custom helpers
+that the helpers become the implementation — with the downside of being neither reviewable
+as YAML nor testable as code.
+
+**Alternatives.** CEL/JSONLogic (rejected for now, revisitable for trivial conditions);
+rules entirely in Python (rejected — not diffable or reviewable by risk/compliance staff).
+
+**Consequences.** A new rule shape needs a Python predicate. Policy changes — severity,
+applicability, thresholds, message — remain YAML-only. An expression layer can be added
+later without changing this contract.
+
+---
+
+## ADR-0010 — Disposition derives from severity AND determinacy
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** `Disposition` is computed from `(determination, severity, determinacy)`.
+Only an adverse result that is **machine-certain** and **serious** becomes a `BLOCKER`.
+`NOT_DETERMINABLE` never blocks at any severity. `NOT_APPLICABLE` is never a finding.
+
+**Why.** Severity alone conflates "this is bad" with "we are sure". A HIGH-severity issue
+a model merely proposed is not the same as one computed deterministically from two
+documents, and presenting them identically is how reviewers learn to ignore findings.
+
+**Consequences.** Model-proposed findings can never auto-block, by construction — which is
+the intended limit on model authority. Raising a model-proposed issue to blocker status
+requires a human.
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |

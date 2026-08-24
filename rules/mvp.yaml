@@ -1,0 +1,190 @@
+# MVP rule set.
+#
+# NOTE ON STATUS: every rule here is DRAFT or PENDING_LEGAL_REVIEW. None is APPROVED,
+# so in ENFORCE mode this rule set produces NO findings. That is the safety property
+# working, not a bug - rules ship disabled until a human signs them off, and an APPROVED
+# rule without `legal_signoff` is rejected at load time.
+#
+# Use DRY_RUN to evaluate drafts against real cases and measure their false-positive rate
+# BEFORE requesting sign-off. That order matters: sign-off should be informed by evidence,
+# not by how reasonable the rule sounds.
+#
+# `citations` referencing docs/regulatory/requirements.yaml is what makes a rule a
+# REGULATORY CHECKPOINT. An empty list marks a BUSINESS RULE, and the review package must
+# present it as such - claiming regulatory backing a rule does not have would be a serious
+# defect in an audit.
+
+version: "0.1.0-draft"
+
+rules:
+
+  # ===================================================================================
+  # Completeness - business rule
+  # ===================================================================================
+
+  - rule_id: DOC_COMPLETENESS_001
+    version: "1.0.0"
+    title: Expected collateral documents received
+    category: completeness
+    severity: MEDIUM
+    determinacy: DETERMINISTIC
+    check: documents_present
+    citations: []          # business rule: no instrument mandates this document set
+    status: DRAFT
+    message: "Missing expected document(s): {missing}"
+    recommended_action: Request the missing documents from the borrower before review.
+
+  # ===================================================================================
+  # Cross-document consistency - business rules that support regulatory checks
+  # ===================================================================================
+
+  - rule_id: XDOC_AREA_001
+    version: "1.0.0"
+    title: Property area consistent across documents
+    category: cross_document
+    severity: HIGH
+    determinacy: DETERMINISTIC
+    check: claim_consistency
+    params:
+      attribute: property.area
+      # 2% absorbs ordinary rounding between deeds. A starting point to be tuned against
+      # reviewer outcomes, not a derived constant. Claims with different measurement
+      # bases (carpet vs super built-up) never agree regardless of this tolerance.
+      tolerance_pct: 2
+    citations: []
+    status: DRAFT
+    message: "Property area: {rationale}"
+    recommended_action: >-
+      Compare the area stated in each document against an authoritative record
+      (Property Card / CTS) before accepting the collateral valuation.
+
+  - rule_id: XDOC_PARCEL_001
+    version: "1.0.0"
+    title: Parcel identifier consistent across documents
+    category: cross_document
+    severity: HIGH
+    determinacy: DETERMINISTIC
+    check: claim_consistency
+    params:
+      attribute: property.parcel_identifier
+    citations: []
+    status: DRAFT
+    message: "Parcel identifier: {rationale}"
+    recommended_action: >-
+      Confirm the documents describe the same parcel. Note that identifiers of different
+      types (CTS vs Survey) are never comparable even when the digits match.
+
+  # ===================================================================================
+  # Title and ownership - regulatory
+  # ===================================================================================
+
+  - rule_id: OWNERSHIP_001
+    version: "1.0.0"
+    title: Ownership established by a title-transferring instrument
+    category: title
+    severity: CRITICAL
+    determinacy: DETERMINISTIC
+    check: ownership_established
+    params:
+      attribute: party.owner
+    citations:
+      - REQ_TPA_54_CONTRACT_CREATES_NO_INTEREST
+      - REQ_TPA_54_SALE_BY_REGISTERED_INSTRUMENT
+    status: DRAFT
+    message: "Ownership: {rationale}"
+    recommended_action: >-
+      Obtain the Sale Deed or other title-transferring instrument. Under TPA s.54 an
+      Agreement of Sale creates no interest in the property and cannot establish
+      ownership on its own.
+
+  # ===================================================================================
+  # Security creation - regulatory, with the Mumbai carve-out
+  # ===================================================================================
+
+  - rule_id: MORTGAGE_REG_001
+    version: "1.0.0"
+    title: Mortgage registration, where required
+    category: security
+    severity: HIGH
+    determinacy: DETERMINISTIC
+    check: mortgage_registration_required
+    citations:
+      - REQ_TPA_59_MORTGAGE_BY_REGISTERED_INSTRUMENT
+      - REQ_TPA_58F_MORTGAGE_BY_DEPOSIT_OF_TITLE_DEEDS
+    status: DRAFT
+    message: "Security type {security_type}: registered instrument required but not evidenced."
+    recommended_action: >-
+      Obtain the registered mortgage deed. Does NOT apply to an equitable mortgage by
+      deposit of title deeds, which TPA s.59 expressly excepts and which is the common
+      Mumbai arrangement.
+
+  - rule_id: CUSTODY_001
+    version: "1.0.0"
+    title: Original title documents held by the lender
+    category: security
+    severity: HIGH
+    determinacy: DETERMINISTIC
+    check: originals_held
+    params:
+      document_types:
+        - sale_deed
+    applicability:
+      security_types: [equitable_deposit_of_title_deeds]
+    citations:
+      - REQ_TPA_58F_MORTGAGE_BY_DEPOSIT_OF_TITLE_DEEDS
+    status: DRAFT
+    message: "Originals not held: {detail}"
+    recommended_action: >-
+      For an equitable mortgage the deposited originals ARE the security. Confirm receipt
+      of originals and record them in the custody inventory, which is also required to
+      meet the 30-day release obligation on repayment.
+
+  # ===================================================================================
+  # LTV - regulatory, HFC-specific
+  # ===================================================================================
+
+  - rule_id: LTV_CAP_001
+    version: "1.0.0"
+    title: LTV within the regulatory cap for the loan slab
+    category: ltv
+    severity: CRITICAL
+    determinacy: DETERMINISTIC
+    check: ltv_within_cap
+    params:
+      # Slab boundaries are INCLUSIVE at the top: "up to Rs.30 lakh", then "above
+      # Rs.30 lakh and up to Rs.75 lakh". A half-open interval would misclassify a
+      # loan of exactly Rs.30,00,000.
+      slabs:
+        - { label: "up to Rs.30 lakh",        max_loan_rupees: 3000000, max_ltv_pct: 90 }
+        - { label: "Rs.30-75 lakh",           max_loan_rupees: 7500000, max_ltv_pct: 80 }
+        - { label: "above Rs.75 lakh",        max_loan_rupees: null,    max_ltv_pct: 75 }
+    applicability:
+      lender_types: [HFC]
+      products: [housing_loan]
+    citations:
+      - REQ_HFC_19_1_LTV_CAP
+      - REQ_HFC_19_1_LTV_COMPUTATION
+    status: DRAFT
+    message: "LTV {ltv}% exceeds the {cap}% cap for {slab} (loan {amount})."
+    recommended_action: >-
+      Reduce the sanctioned amount or obtain a higher supportable valuation. Note the
+      numerator is total outstanding without netting, not sanctioned principal.
+
+  - rule_id: LTV_CONSIDERATION_001
+    version: "1.0.0"
+    title: LTV property value not above documented transaction value
+    category: ltv
+    severity: HIGH
+    determinacy: DETERMINISTIC
+    check: ltv_value_not_above_documented_consideration
+    params:
+      attribute: transaction.consideration
+    applicability:
+      lender_types: [HFC]
+    citations:
+      - REQ_HFC_AXIV_1_9_VALUE_NOT_ABOVE_DOCUMENTED_CONSIDERATION
+    status: DRAFT
+    message: "Property value for LTV ({value}) exceeds the documented transaction value ({documented})."
+    recommended_action: >-
+      Cap the LTV denominator at the consideration stated in the agreement to sale or
+      sale deed, per HFC Master Direction Annex XIV 1.9.

@@ -12,7 +12,18 @@ from .case import (
     Document,
     DocumentQuality,
     LenderType,
+    LoanTerms,
     Product,
+    TransactionType,
+)
+from .findings import (
+    CheckResult,
+    Determinacy,
+    Disposition,
+    Evidence,
+    Finding,
+    derive_disposition,
+    sort_findings,
 )
 from .claims import (
     AreaValue,
@@ -53,12 +64,14 @@ from .provenance import (
 )
 
 __all__ = [
-    "Area", "AreaUnit", "AreaValue", "BoolValue", "BoundingBox", "Case", "Claim",
-    "ClaimSet", "ClaimValue", "ConfidenceTier", "CustodyStatus", "DateValue",
-    "DerivedProvenance", "Determination", "Document", "DocumentProvenance",
-    "DocumentQuality", "DocumentType", "ExternalProvenance", "HumanProvenance",
-    "InstrumentStrength", "LenderType", "Money", "MoneyValue", "ParcelIdentifier",
+    "Area", "AreaUnit", "AreaValue", "BoolValue", "BoundingBox", "Case", "CheckResult",
+    "Claim", "ClaimSet", "ClaimValue", "ConfidenceTier", "CustodyStatus", "DateValue",
+    "DerivedProvenance", "Determinacy", "Determination", "Disposition", "Document",
+    "DocumentProvenance", "DocumentQuality", "DocumentType", "Evidence",
+    "ExternalProvenance", "Finding", "HumanProvenance", "InstrumentStrength",
+    "LenderType", "LoanTerms", "Money", "MoneyValue", "ParcelIdentifier",
     "ParcelIdentifierType", "ParcelValue", "Party", "ProcessingContext", "Product",
     "Project", "Property", "Provenance", "Resolution", "SecurityType", "Severity",
-    "TextSpan", "TextValue", "instrument_strength_of",
+    "TextSpan", "TextValue", "TransactionType", "derive_disposition",
+    "instrument_strength_of", "sort_findings",
 ]
