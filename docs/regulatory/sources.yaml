@@ -180,24 +180,37 @@ instruments:
     key_sections: ["17"]
     url: https://www.indiacode.nic.in/bitstream/123456789/15937/1/the_registration_act,1908.pdf
     section_url: https://www.indiacode.nic.in/show-data?actid=AC_CEN_18_43_00004_190816_1523340837338&orderno=18
+    local_copy: docs/regulatory/sources/registration-act-1908-s17.pdf
     retrieved_on: 2026-08-24
-    verification_status: PRIMARY_LOCATED
+    verification_status: SECONDARY_ONLY   # aggregator extract, not the official bare Act
     in_scope_for_us: true
     obligation_kind: platform_checks
     priority: HIGH
+    key_sections_needed: ["17", "49"]
     notes: >-
-      s.17 determines which instruments MUST be registered. Basis for a deterministic
-      document-defect check: an instrument requiring registration that shows no
-      registration particulars is a defect.
+      s.17 read from an Indian Kanoon extract. Two requirements recorded from it
+      (REQ_REG_17_1_B_COMPULSORY_REGISTRATION, REQ_REG_17_1A_AGREEMENT_OF_SALE_REGISTRATION)
+      but BOTH are pending confirmation against the official text, per the
+      PRIMARY_VERIFIED invariant at the top of this file. They must not be promoted to rules
+      until the India Code copy is obtained.
+      s.49 (effect of non-registration) is the outstanding gap: without it the platform can
+      detect a missing registration but cannot state its legal consequence, which is the
+      part a Risk Manager actually acts on.
 
   - id: INST_TPA_1882
     authority: AUTH_PARLIAMENT
     title: The Transfer of Property Act, 1882
     url: null
-    verification_status: PRIMARY_LOCATED
+    local_copy: docs/regulatory/sources/transfer-of-property-act-1882.pdf
+    pages: 46
+    verification_status: PRIMARY_VERIFIED
     in_scope_for_us: true
     obligation_kind: platform_checks
-    notes: Governs valid sale, mortgage and charge. Locate official text in B1.
+    notes: >-
+      B1 EXTRACTION DONE for s.54. Yields REQ_TPA_54_SALE_BY_REGISTERED_INSTRUMENT and
+      REQ_TPA_54_CONTRACT_CREATES_NO_INTEREST. The latter is an architectural constraint on
+      the canonical model, not merely a checkpoint: an Agreement of Sale evidences a
+      contract, never ownership. Chapter IV (mortgages, s.58-59) not yet extracted.
 
   - id: INST_MH_STAMP_ACT_1958
     authority: AUTH_PARLIAMENT
@@ -215,22 +228,40 @@ instruments:
     title: >-
       Securitisation and Reconstruction of Financial Assets and Enforcement of
       Security Interest Act, 2002
-    key_chapters: ["IV"]
-    verification_status: PRIMARY_LOCATED
+    key_chapters: ["IV", "IVA"]
+    local_copy: docs/regulatory/sources/sarfaesi-act-2002.pdf
+    pages: 38
+    verification_status: PRIMARY_VERIFIED
     in_scope_for_us: true
     obligation_kind: platform_checks
-    notes: Chapter IV is the statutory basis for CERSAI registration of security interests.
+    notes: >-
+      B1 EXTRACTION DONE for Chapter IV. s.22 establishes the Central Register, s.23 the
+      filing duty, s.26 an inspection right open to ANY PERSON including through electronic
+      media - the statutory basis for the CERSAI adapter.
+      NOT YET EXTRACTED: Chapter IVA (s.26B registration by secured creditors, s.26C effect
+      of registration, s.26E priority to secured creditors). s.26C and s.26E matter for
+      collateral risk because they govern what an unregistered charge loses.
 
   - id: INST_RERA_2016
     authority: AUTH_PARLIAMENT
     title: The Real Estate (Regulation and Development) Act, 2016
-    verification_status: PRIMARY_LOCATED
+    local_copy: docs/regulatory/sources/rera-act-2016.pdf
+    pages: 36
+    verification_status: PRIMARY_VERIFIED
     in_scope_for_us: true
     obligation_kind: platform_checks
     notes: >-
-      B1 must establish the registration threshold precisely. Secondary sources report
-      >500 sq m land area or >8 apartments. This threshold decides NOT_APPLICABLE vs
-      NOT_FOUND_IN_SOURCE for MahaRERA checks and is therefore false-positive critical.
+      B1 EXTRACTION DONE for s.3. THE B0 THRESHOLD NOTE WAS WRONG. Secondary sources gave
+      "registration required above 500 sq m OR more than 8 apartments". The statute is an
+      exemption with a disjunction - exempt where (area <= 500) OR (apartments <= 8) - so
+      registration is required only where (area > 500) AND (apartments > 8). Plus two
+      further exemptions in s.3(2)(b) and (c). See REQ_RERA_3_2_REGISTRATION_EXEMPTION,
+      marked REQUIRES_LEGAL_REVIEW.
+      s.3 Explanation: every phase is a standalone project with its own registration, which
+      changes how project-name comparison must work.
+    open_questions:
+      - Commencement date is appointed by notification and is not stated in the Act.
+      - Has Maharashtra used the s.3(2)(a) proviso to reduce the threshold?
 
   - id: INST_MLRC_1966
     authority: AUTH_PARLIAMENT
@@ -373,12 +404,21 @@ local_copy_provenance:
 
   - file: registration-act-1908-s17.pdf
     grade: EXTRACT_ONLY
+    publisher: "Indian Kanoon (confirmed from the page footer: indiankanoon.org/doc/173536363/)"
     reason: >-
-      Contains Section 17 alone, not the full Act, and is formatted as a third-party
-      section extract rather than the official bare Act. Sufficient to READ s.17;
-      insufficient to confirm that s.17 has not been amended, or to check
-      cross-referenced sections (s.18, s.49 on the effect of non-registration).
-    action: Obtain the full Act from India Code before authoring a registration rule.
+      Contains Section 17 alone, not the full Act, and is published by a case-law
+      aggregator rather than an official source. Sufficient to READ s.17 - the text carries
+      inline amendment annotations and appears complete for that section - but insufficient
+      to confirm the section is current, or to check cross-referenced sections (s.18, and
+      especially s.49 on the effect of non-registration, which supplies the CONSEQUENCE of
+      the defect this platform would flag).
+    action: >-
+      Obtain the full Act from India Code before authoring a registration rule. s.49 is the
+      priority: without it we can detect a missing registration but cannot state its legal
+      effect, which is what a Risk Manager actually needs.
+    extracted_anyway: >-
+      REQ_REG_17_1_B_COMPULSORY_REGISTRATION and REQ_REG_17_1A_AGREEMENT_OF_SALE_REGISTRATION
+      recorded from this copy, both flagged as pending confirmation against the official text.
 
   - file: maharashtra-stamp-act-1958.pdf
     grade: STALE_UNVERIFIED

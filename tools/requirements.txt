@@ -1,6 +1,7 @@
-# Phase 0 corpus survey only. Deliberately minimal and permissively licensed.
-# No AI/ML dependencies, no network clients.
+# Phase 0 tooling and B1 regulatory research. Deliberately minimal and permissively
+# licensed. No AI/ML dependencies, no network clients.
 
-pypdfium2>=4.30    # Apache-2.0 / BSD-3 — PDF parsing and rendering
-numpy>=1.26        # BSD-3 — sharpness metrics
-pillow>=10.0       # MIT-CMU — standalone image files
+pypdfium2>=4.30    # Apache-2.0 / BSD-3 - PDF parsing and rendering
+numpy>=1.26        # BSD-3 - sharpness metrics
+pillow>=10.0       # MIT-CMU - standalone image files
+pyyaml>=6.0        # MIT - regulatory knowledge base checks

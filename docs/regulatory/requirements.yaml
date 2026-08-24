@@ -200,6 +200,201 @@ requirements:
       usefully confirm that approved plans and statutory approvals are underwriting-relevant
       artefacts, which supports extending document types beyond the MVP five later.
 
+  # ===================================================================================
+  # Registration Act, 1908 - s.17
+  # ===================================================================================
+
+  - id: REQ_REG_17_1_B_COMPULSORY_REGISTRATION
+    source: INST_REGISTRATION_ACT_1908
+    location: "Section 17(1)(b)"
+    quote: >-
+      The following documents shall be registered ... (b) other non-testamentary
+      instruments which purport or operate to create, declare, assign, limit or extinguish,
+      whether in present or in future, any right, title or interest, whether vested or
+      contingent, of the value of one hundred rupees and upwards, to or in immovable
+      property
+    applicability:
+      document_type: [sale_deed, gift_deed, mortgage_deed, other_title_instrument]
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [registration_number, registration_date, sro_name, instrument_value]
+    notes: >-
+      The Rs.100 threshold is effectively always met for collateral property, so in practice
+      any Sale Deed in a lending case must carry registration particulars. A Sale Deed with
+      no registration particulars is a DOCUMENT DEFECT, and a high-severity one - it goes to
+      whether title passed at all, not to formatting.
+
+  - id: REQ_REG_17_1A_AGREEMENT_OF_SALE_REGISTRATION
+    source: INST_REGISTRATION_ACT_1908
+    location: "Section 17(1-A), inserted by Act 48 of 2001 w.e.f. 2001-09-24"
+    quote: >-
+      The documents containing contracts to transfer for consideration, any immovable
+      property for the purpose of section 53-A of the Transfer of Property Act, 1882, shall
+      be registered if they have been executed on or after the commencement of the
+      Registration and Other Related Laws (Amendment) Act, 2001, and if such documents are
+      not registered on or after such commencement then, they shall have no effect for the
+      purposes of the said section 53-A.
+    applicability:
+      document_type: [agreement_of_sale]
+      execution_date: ">= 2001-09-24"
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [agreement_execution_date, registration_particulars]
+    priority: HIGH
+    notes: >-
+      DIRECTLY APPLICABLE TO AN MVP DOCUMENT TYPE. An unregistered Agreement of Sale executed
+      on or after 2001-09-24 has no effect for part-performance protection under s.53A TPA.
+      Both inputs - execution date and presence of registration particulars - are planned
+      extraction fields, so this is a clean deterministic check. Note the date condition:
+      the rule must NOT fire on pre-2001 agreements.
+
+  # ===================================================================================
+  # Transfer of Property Act, 1882
+  # ===================================================================================
+
+  - id: REQ_TPA_54_SALE_BY_REGISTERED_INSTRUMENT
+    source: INST_TPA_1882
+    location: "Section 54, 'Sale how made' (PDF p20)"
+    quote: >-
+      Such transfer, in the case of tangible immoveable property of the value of one hundred
+      rupees and upwards, or in the case of a reversion or other intangible thing, can be
+      made only by a registered instrument.
+    applicability:
+      document_type: [sale_deed]
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    notes: >-
+      Reinforces REQ_REG_17_1_B from the substantive side: registration is not merely a
+      procedural duty, it is the ONLY way the transfer can be made. Cite both together when
+      raising a missing-registration finding.
+
+  - id: REQ_TPA_54_CONTRACT_CREATES_NO_INTEREST
+    source: INST_TPA_1882
+    location: "Section 54, 'Contract for sale' (PDF p20)"
+    quote: >-
+      A contract for the sale of immoveable property is a contract that a sale of such
+      property shall take place on terms settled between the parties. It does not, of
+      itself, create any interest in or charge on such property.
+    applicability:
+      document_type: [agreement_of_sale]
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    priority: HIGH
+    notes: >-
+      ARCHITECTURAL CONSTRAINT ON THE CANONICAL MODEL, not just a checkpoint. An Agreement
+      of Sale is evidence of a CONTRACT, never of OWNERSHIP. The claim-based model must
+      therefore type ownership claims by the strength of the instrument asserting them: a
+      buyer named in an Agreement of Sale is a prospective purchaser, not an owner. Treating
+      the two as interchangeable claims about "owner" would let a case with only an
+      Agreement of Sale appear to establish title. Encode instrument strength on the claim.
+
+  # ===================================================================================
+  # RERA Act, 2016 - s.3
+  # ===================================================================================
+
+  - id: REQ_RERA_3_2_REGISTRATION_EXEMPTION
+    source: INST_RERA_2016
+    location: "Section 3(2) (PDF p9)"
+    quote: >-
+      Notwithstanding anything contained in sub-section (1), no registration of the real
+      estate project shall be required- (a) where the area of land proposed to be developed
+      does not exceed five hundred square meters or the number of apartments proposed to be
+      developed does not exceed eight inclusive of all phases: Provided that, if the
+      appropriate Government considers it necessary, it may, reduce the threshold ... (b)
+      where the promoter has received completion certificate for a real estate project prior
+      to commencement of this Act; (c) for the purpose of renovation or repair or
+      re-development which does not involve marketing, advertising selling or new allotment
+      ...
+    applicability:
+      verification_source: SRC_MAHARERA
+    obligation_kind: platform_checks
+    feasibility: HUMAN_ONLY
+    status: REQUIRES_LEGAL_REVIEW
+    priority: HIGHEST
+    notes: >-
+      THIS CORRECTS THE B0 AUTHORITY MAP. B0 recorded, from secondary sources, that
+      registration is required for projects "above 500 sq m OR more than 8 apartments".
+      The statute is drafted as an EXEMPTION with a disjunction: exempt where
+      (area <= 500) OR (apartments <= 8). Negating that gives registration required only
+      where (area > 500) AND (apartments > 8) - a CONJUNCTION, which is materially
+      narrower than the secondary-source formulation.
+      Do NOT encode either reading as settled. The literal reading is contested in
+      practice, and s.3(2)(b) and (c) add two further exemptions - completion certificate
+      before commencement, and renovation/redevelopment without new allotment - that
+      between them cover much of the older Mumbai resale stock.
+      Marked REQUIRES_LEGAL_REVIEW. Until resolved, a missing MahaRERA record must default
+      to NOT_APPLICABLE or NOT_DETERMINABLE, never to a finding.
+    open_questions:
+      - Has Maharashtra exercised the proviso to reduce the threshold?
+      - Commencement date of the Act (appointed by notification, not stated in the Act).
+
+  - id: REQ_RERA_3_EXPLANATION_PHASE_IS_STANDALONE
+    source: INST_RERA_2016
+    location: "Section 3, Explanation (PDF p9)"
+    quote: >-
+      For the purpose of this section, where the real estate project is to be developed in
+      phases, every such phase shall be considered a stand alone real estate project, and
+      the promoter shall obtain registration under this Act for each phase separately.
+    applicability:
+      verification_source: SRC_MAHARERA
+    obligation_kind: platform_checks
+    feasibility: EXTERNAL_VERIFIABLE
+    priority: HIGH
+    notes: >-
+      REFINES THE VERIFICATION COMPARISON LOGIC. Each phase is a separate project with its
+      OWN registration number. So the worked example used in early design - deed says
+      "ABC Residency", RERA says "ABC Residency Phase II" - is NOT necessarily a mismatch;
+      it is the expected shape when a project is phased. Project-name comparison must be
+      phase-aware and should key on registration number rather than name wherever the
+      number is available. Naive string comparison here would generate false positives on
+      every phased project.
+
+  # ===================================================================================
+  # SARFAESI Act, 2002 - Chapter IV (Central Registry / CERSAI)
+  # ===================================================================================
+
+  - id: REQ_SARFAESI_23_FILING_OF_SECURITY_INTEREST
+    source: INST_SARFAESI_2002
+    location: "Section 23 (PDF p28)"
+    quote: >-
+      The particulars of every transaction of securitisation, asset reconstruction or
+      creation of security interest shall be filed, with the Central Registrar in the manner
+      and on payment of such fee as may be prescribed
+    applicability:
+      lender_type: [HFC, NBFC, bank]
+    obligation_kind: platform_tracks
+    feasibility: EXTERNAL_VERIFIABLE
+    notes: >-
+      TIME LIMIT NOT ASSERTED. The commonly cited "within thirty days" does not appear in
+      this text; the provision carries visible amendment/omission markers where a limit
+      previously stood. Do not encode 30 days without checking the amending Act and the
+      prescribed rules.
+
+  - id: REQ_SARFAESI_26_RIGHT_TO_INSPECT
+    source: INST_SARFAESI_2002
+    location: "Section 26(1) and 26(2) (PDF p29)"
+    quote: >-
+      The particulars of securitisation or reconstruction or security interest entered in
+      the Central register of such transactions kept under section 22 shall be open during
+      the business hours for inspection by any person on payment of such fees as may be
+      prescribed. (2) The Central Register referred to in sub-section (1) maintained in
+      electronic form shall also be open during the business hours for the inspection of any
+      person through electronic media on payment of such fees as may be prescribed.
+    applicability:
+      verification_source: SRC_CERSAI
+    obligation_kind: platform_checks
+    feasibility: EXTERNAL_VERIFIABLE
+    priority: HIGHEST
+    notes: >-
+      STATUTORY BASIS FOR THE CERSAI VERIFICATION ADAPTER, and the strongest access
+      footing of any source in the map. Inspection is open to ANY PERSON, expressly
+      including through electronic media, on payment of prescribed fees. This is a
+      statutory public register with an electronic inspection right - not a discretionary
+      portal whose terms of use might forbid programmatic access. It materially strengthens
+      the T1/T2 tier assignment for CERSAI recorded in sources.yaml.
+      Caveat: a statutory inspection right is not the same as a documented API. It
+      establishes that access is lawful, not that it is automatable. Confirm the mechanism.
+
 # =====================================================================================
 # NEGATIVE FINDINGS
 #

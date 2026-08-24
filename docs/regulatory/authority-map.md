@@ -97,13 +97,31 @@ terms of use, which could not be retrieved. **Provisional working assumption: T4
 (portal, human-operated).** Do not build an automated adapter against it until the terms are
 read from an Indian network.
 
-**Applicability caveat that must be encoded, not assumed.** RERA registration applies to
-projects meeting statutory thresholds (secondary sources report land area >500 sq m or >8
-apartments — to confirm in B1). A large share of Mumbai LAP collateral will be older resale
-flats and independent properties with **no RERA record at all**. For those, the correct
-verification result is `NOT_APPLICABLE`, not `NOT_FOUND_IN_SOURCE`, and certainly not a
-finding. Getting this distinction wrong would generate false positives on a large fraction
-of real cases.
+**Applicability caveat that must be encoded, not assumed. — CORRECTED IN B1.**
+
+B0 recorded, from secondary sources, that registration is required for projects "above 500
+sq m **or** more than 8 apartments". **Reading the statute showed that is the wrong shape.**
+s.3(2) is drafted as an *exemption* with a disjunction: no registration required where
+(area ≤ 500 sq m) **or** (apartments ≤ 8). Negated, registration is required only where
+(area > 500) **and** (apartments > 8) — a conjunction, materially narrower than the
+secondary-source version.
+
+Two further exemptions in s.3(2)(b) and (c) — completion certificate obtained before the
+Act commenced, and renovation/redevelopment without new allotment — between them cover much
+of the older Mumbai resale stock.
+
+Neither reading is encoded as settled; see `REQ_RERA_3_2_REGISTRATION_EXEMPTION`, marked
+`REQUIRES_LEGAL_REVIEW`. Until it is resolved, a missing MahaRERA record defaults to
+`NOT_APPLICABLE` or `NOT_DETERMINABLE`, never to a finding.
+
+**Also corrected: phase handling.** s.3 Explanation makes every phase a standalone project
+with its own registration. The early worked example — deed says "ABC Residency", RERA says
+"ABC Residency Phase II" — is therefore *not* automatically a mismatch. Comparison must be
+phase-aware and should key on registration number rather than project name.
+
+This is a concrete illustration of why the `SECONDARY_ONLY` bar exists: the secondary
+formulation was plausible, widely repeated, and would have produced false positives on a
+large fraction of real Mumbai cases.
 
 ---
 

@@ -41,11 +41,32 @@ docs/
   regulatory/
     authority-map.md              B0 deliverable — who governs what, human-readable
     sources.yaml                  B0 deliverable — machine-readable source register
+  regulatory/
+    authority-map.md              B0 — who governs what, human-readable
+    sources.yaml                  B0 — machine-readable source register + provenance
+    requirements.yaml             B1 — atomic requirements, quoted with citations
+    B1-source-fetch-list.md       which primary instruments are still needed
+    sources/                      the primary instruments themselves (public)
 tools/
   corpus_survey.py                Phase 0 — measure the real document corpus
   make_fixtures.py                synthetic fixtures (tier-1 dev data)
+  reg_text.py                     B1 — search primary instruments
+  check_regulatory.py             B1 — enforce knowledge-base invariants
   requirements.txt
 ```
+
+## The invariant
+
+A requirement may only be promoted to an executable rule if its source is
+`PRIMARY_VERIFIED` — read from an authoritative copy — and is not flagged
+`REQUIRES_LEGAL_REVIEW`. This is enforced, not just documented:
+
+```bash
+python tools/check_regulatory.py
+```
+
+Exit 0 clean, 1 error, 2 warnings. Warnings name every requirement that is *not* yet
+rule-ready and why.
 
 ## Setup
 
