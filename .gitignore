@@ -55,3 +55,6 @@ fixtures/
 .vscode/
 Thumbs.db
 desktop.ini
+
+# Public regulatory PDFs - large, and not ours to redistribute
+docs/regulatory/sources/

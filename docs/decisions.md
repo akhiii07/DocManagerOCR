@@ -100,19 +100,39 @@ capture and audit. A source moving from T4 to T1 later is a config change.
 
 ---
 
-## ADR-0006 — External verification adapters must run from Indian infrastructure (provisional)
-**Date:** 2026-08-24 · **Status:** Proposed — needs verification
+## ADR-0006 — Indian authority sources are not reachable from this research environment
+**Date:** 2026-08-24 · **Status:** Accepted (observation); mitigation Proposed
 
-**Observation.** During B0 research, `maharera.maharashtra.gov.in` and
-`igrmaharashtra.gov.in` both reset the connection when fetched from US-based
-infrastructure, while the RBI and India Code sites responded normally.
+**Observations.** Three distinct failure modes across four hosts:
 
-**Provisional decision.** Assume verification adapters must egress from Indian
-infrastructure. Do not design for adapters running from arbitrary regions.
+| Host | Result |
+|---|---|
+| `maharera.maharashtra.gov.in` | connection reset |
+| `igrmaharashtra.gov.in` | connection reset |
+| `rbidocs.rbi.org.in` (PDF host) | HTTP "Request Rejected" — WAF block with support ID |
+| `www.rbi.org.in` (HTML notifications) | **works** |
+| `indiacode.nic.in` | **works** |
 
-**Not yet established.** Whether this is deliberate geo-restriction, generic bot filtering,
-or a transient failure. **Verify by retrying from an Indian network before treating this as
-settled.** It is recorded here because it would materially affect deployment topology.
+The split matters: RBI's HTML notification pages are readable, but RBI's **PDF host is
+blocked**. Every Master Direction lives on the blocked host. So B0 (identify instruments,
+read HTML circulars) succeeded, while B1 (read the full text of Master Directions) cannot
+proceed from here.
+
+**Consequence for B1 — this is a live blocker, not a caveat.** Deep reading of primary
+instruments requires the PDFs to be fetched by other means. These are **public regulatory
+documents with no privacy sensitivity**, so the mitigation is simply to download them
+locally and read them from disk:
+
+```
+docs/regulatory/sources/    (gitignored — public docs, but large and not ours to redistribute)
+```
+
+**Consequence for Phase 7 (provisional).** Assume external verification adapters must
+egress from Indian infrastructure. Do not design for adapters running from arbitrary
+regions. Still **not established** whether the portal failures are deliberate
+geo-restriction, generic bot filtering, or transient — verify by retrying from an Indian
+network before treating the geo-restriction conclusion as settled. The rbidocs WAF block is
+established; the portal geo-restriction hypothesis is not.
 
 ---
 
