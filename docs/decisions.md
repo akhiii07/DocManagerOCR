@@ -138,6 +138,54 @@ established; the portal geo-restriction hypothesis is not.
 
 ---
 
+## ADR-0007 — Canonical model is claim-based, with instrument strength and typed parcel keys
+**Date:** 2026-08-24 · **Status:** Accepted · **Implements:** ADR-0003
+
+**Decision.** `src/dmocr/model/` implements the canonical model as claim sets rather than
+fields. Three distinctions are load-bearing and were added because B1 findings showed the
+simpler shape produces wrong findings:
+
+1. **`InstrumentStrength` on claims** — TPA s.54 means an Agreement of Sale evidences a
+   contract, never ownership. `resolve(ownership_only=True)` filters accordingly.
+2. **Typed `ParcelIdentifier`** — Mumbai uses CTS numbers, not survey numbers. Different
+   types never compare equal.
+3. **`SecurityType` gating registration** — TPA s.59 exempts mortgage by deposit of title
+   deeds, which is the dominant Mumbai practice.
+
+**Also.** A single claim resolves to `NOT_DETERMINABLE`, not `MATCH` — a lone assertion is
+not agreement. Money is integer paise; area is Decimal square metres carrying its
+measurement basis.
+
+**Alternatives.** Field-with-confidence (simpler, lossy — rejected in ADR-0003); untyped
+identifier strings (rejected: compares incomparable keys); unconditional registration rule
+(rejected: false-positive generator for Mumbai).
+
+**Consequences.** More complex reads — every access is a resolution with an explicit
+determination. That verbosity is the point. See [canonical-model.md](canonical-model.md).
+
+---
+
+## ADR-0008 — Reject stale or aggregator copies of primary instruments
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** A PDF placed in `docs/regulatory/sources/` is not automatically
+authoritative. Every file is graded in `sources.yaml` under `local_copy_provenance`, and
+`tools/check_regulatory.py` fails if any file lacks a grade — an ungraded document is an
+unverified document.
+
+**Why.** Three supplied files turned out to be aggregator copies self-declaring "this
+content could not be verified": the Maharashtra Stamp Act (2019, ~6 years stale, and a
+Fourth Amendment landed in 2026), a second Transfer of Property Act copy (version as at
+2003), and the Registration Act s.17 extract (Indian Kanoon). Grounding stamp-duty rules
+on a 2019 text would have produced confidently wrong compliance results.
+
+**Consequences.** Some requirements stay blocked rather than shipping on weak sources.
+`check_regulatory.py` enforces that a requirement may only become a rule when its source is
+`PRIMARY_VERIFIED` and it is not flagged `REQUIRES_LEGAL_REVIEW`. Currently 3 of 21 are
+blocked. See [OPEN-ITEMS.md](OPEN-ITEMS.md).
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |
