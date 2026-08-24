@@ -207,21 +207,48 @@ instruments:
     in_scope_for_us: true
     obligation_kind: platform_checks
     notes: >-
-      B1 EXTRACTION DONE for s.54. Yields REQ_TPA_54_SALE_BY_REGISTERED_INSTRUMENT and
-      REQ_TPA_54_CONTRACT_CREATES_NO_INTEREST. The latter is an architectural constraint on
+      B1 EXTRACTION DONE for s.54 and Chapter IV (s.58-59).
+      s.54 yields REQ_TPA_54_SALE_BY_REGISTERED_INSTRUMENT and
+      REQ_TPA_54_CONTRACT_CREATES_NO_INTEREST - the latter an architectural constraint on
       the canonical model, not merely a checkpoint: an Agreement of Sale evidences a
-      contract, never ownership. Chapter IV (mortgages, s.58-59) not yet extracted.
+      contract, never ownership.
+      s.58(f) names Bombay as a town where mortgage by deposit of title-deeds is available,
+      and s.59 expressly EXEMPTS such mortgages from the registered-instrument requirement.
+      Together these make "a mortgage must be registered" a false-positive generator for
+      Mumbai, and explain why document custody is a real system output.
 
   - id: INST_MH_STAMP_ACT_1958
     authority: AUTH_PARLIAMENT
     title: The Maharashtra Stamp Act, 1958
     text_as_on: 2025-04-08
     url: https://www.indiacode.nic.in/bitstream/123456789/22026/1/the_maharashtra_stamp_act,_1958.pdf
+    local_copy: docs/regulatory/sources/maharashtra-stamp-act-1958.pdf
     retrieved_on: 2026-08-24
-    verification_status: PRIMARY_LOCATED
+    verification_status: SECONDARY_ONLY   # local copy is a 2019 aggregator text
     in_scope_for_us: true
     obligation_kind: platform_checks
-    notes: Stamp duty adequacy; under-stamping affects admissibility of the instrument.
+    notes: >-
+      Stamp duty adequacy; under-stamping affects admissibility of the instrument.
+      BLOCKED: the local copy is an aggregator text last updated 2019 and self-declaring
+      that it could not be verified. No stamp-duty requirement has been extracted, and none
+      may be until a current official text is obtained.
+    known_amendments:
+      - title: Maharashtra Stamp (Fourth Amendment) Act, 2026
+        notified_on_claimed: 2026-07-22
+        source_type: SECONDARY_ONLY
+        source_url: https://www.scconline.com/blog/post/2026/07/28/maharashtra-stamp-fourth-amendment-act-2026-explained/
+        retrieved_on: 2026-08-24
+        summary_claimed: >-
+          Inserts Article 34A into Schedule I prescribing tiered stamp duty on GUARANTEE
+          instruments, and deletes the separate Letter of Guarantee entry under Article 37.
+        relevance: >-
+          Reported NOT to affect conveyance, agreement to sale, or mortgage of immovable
+          property - so no direct impact on the five MVP document types. Its real
+          significance for us is corroborative: a FOURTH amendment in 2026 confirms this Act
+          is actively amended and that the 2019 local copy is unusable.
+          Guarantee instruments are lending collateral but are outside the MVP document set;
+          flag if personal/corporate guarantees are added later.
+        action: Obtain the Gazette text before relying on any of the above.
 
   - id: INST_SARFAESI_2002
     authority: AUTH_PARLIAMENT
@@ -238,9 +265,13 @@ instruments:
       B1 EXTRACTION DONE for Chapter IV. s.22 establishes the Central Register, s.23 the
       filing duty, s.26 an inspection right open to ANY PERSON including through electronic
       media - the statutory basis for the CERSAI adapter.
-      NOT YET EXTRACTED: Chapter IVA (s.26B registration by secured creditors, s.26C effect
-      of registration, s.26E priority to secured creditors). s.26C and s.26E matter for
-      collateral risk because they govern what an unregistered charge loses.
+      CHAPTER IVA NOW ALSO EXTRACTED: s.26C (registration is deemed public notice, and
+      confers priority over subsequent security interests), s.26D (no enforcement under
+      Chapter III unless registered with the Central Registry), s.26E (priority over other
+      debts, revenues and taxes, subject to the IBC).
+      Together with TPA s.58(f)/s.59 these complete the Mumbai security picture: the
+      equitable mortgage is not registered with the sub-registrar, so CERSAI filing is what
+      supplies public notice and unlocks enforcement.
 
   - id: INST_RERA_2016
     authority: AUTH_PARLIAMENT
@@ -393,6 +424,14 @@ local_copy_provenance:
   - file: transfer-of-property-act-1882.pdf
     grade: LIKELY_AUTHORITATIVE
     reason: Official "ARRANGEMENT OF SECTIONS" bare-act format consistent with India Code.
+    rejected_alternative: >-
+      On 2026-08-24 a second TPA copy was supplied (The_Transfer_Of_Property_Act_1882.PDF,
+      45 pages, 146k chars). It was REJECTED and NOT adopted: it is from the same aggregator
+      as the stale stamp act, carries the disclaimer "the original publication document is
+      not available and this content could not be verified", and states "[This is the
+      version of this document from 1 January 2003]" - 23 years stale. The incumbent copy
+      (46 pages, 160k chars, official bare-act format) was retained. Recorded so the
+      rejection is not silently repeated or reversed.
 
   - file: sarfaesi-act-2002.pdf
     grade: LIKELY_AUTHORITATIVE

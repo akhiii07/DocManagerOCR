@@ -1,53 +1,54 @@
-# B1 — primary sources to fetch locally
+# B1 — primary sources: status and what is still needed
 
-B1 (requirement extraction) is blocked on document access, not on analysis. See ADR-0006:
-every PDF-hosted primary instrument is unreachable from the research environment, while
-search engines can still see them.
+Updated 2026-08-24. See ADR-0006 for why these must be fetched manually.
 
-**These are public regulatory documents. There is no privacy sensitivity here** — this is
-purely a retrieval problem. Download them and B1 proceeds immediately.
+**These are public regulatory documents with no privacy sensitivity.** Retrieval only.
 
-## Where to put them
+Files live in `docs/regulatory/sources/`. Provenance is graded per file in
+`sources.yaml` under `local_copy_provenance` — a PDF in that folder is not automatically
+authoritative, and two of the current ones are not.
 
-```
-docs/regulatory/sources/
-```
+## Obtained and extracted
 
-Gitignored — they are large and not ours to redistribute. Keep the filenames below so
-citations in the requirement register resolve.
-
-## Priority 1 — needed to start B1
-
-| Save as | Document | Where |
+| File | Instrument | Status |
 |---|---|---|
-| `rbi-hfc-md-2021.pdf` | Master Direction – NBFC-HFC (Reserve Bank) Directions, 2021 (RBI/2020-21/73) | [RBI Master Direction page](https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12030) → follow the PDF link |
-| `registration-act-1908.pdf` | The Registration Act, 1908 — s.17 is the target | [India Code](https://www.indiacode.nic.in/bitstream/123456789/15937/1/the_registration_act,1908.pdf) |
-| `maharashtra-stamp-act-1958.pdf` | The Maharashtra Stamp Act, 1958 (text as on 2025-04-08) | [India Code](https://www.indiacode.nic.in/bitstream/123456789/22026/1/the_maharashtra_stamp_act,_1958.pdf) |
+| `rbi-hfc-md-2021.pdf` | HFC Master Direction, 2021 | Para 19, Para 104, Annex XIV, Appendix XII(b) extracted |
+| `transfer-of-property-act-1882.pdf` | Transfer of Property Act, 1882 | s.54 and Chapter IV (s.58–59) extracted |
+| `sarfaesi-act-2002.pdf` | SARFAESI Act, 2002 | Chapter IV (s.22, 23, 26) and Chapter IVA (s.26C–26E) extracted |
+| `rera-act-2016.pdf` | RERA Act, 2016 | s.3 extracted; corrected the B0 threshold error |
 
-## Priority 2 — needed to complete B1
+## Obtained, extraction pending
 
-| Save as | Document | Where |
+| File | Instrument | Next |
 |---|---|---|
-| `transfer-of-property-act-1882.pdf` | The Transfer of Property Act, 1882 | India Code |
-| `sarfaesi-act-2002.pdf` | SARFAESI Act, 2002 — Chapter IV (CERSAI basis) | India Code |
-| `rera-act-2016.pdf` | Real Estate (Regulation and Development) Act, 2016 — registration threshold | India Code |
-| `rbi-outsourcing-it-md-2023.pdf` | Master Direction on Outsourcing of IT Services | [RBI](https://www.rbi.org.in/scripts/BS_ViewMasDirections.aspx?id=12486) |
-| `mlrc-1966.pdf` | Maharashtra Land Revenue Code, 1966 — confirm the Property Card section | India Code |
-| `dpdp-rules-2025.pdf` | DPDP Rules, 2025 — **confirm commencement dates against the Gazette** | MeitY / eGazette |
+| `rbi-outsourcing-it-md-2023.pdf` | Outsourcing of IT Services MD | Binds *this platform* as an IT service. Confirm HFC applicability first — the addressee list says "NBFCs" without the "including HFCs" wording used elsewhere. |
+| `mh-city-survey-rules-1969.pdf` | City Survey Rules, 1969 | Background on the Property Card mechanism. Aggregator copy — orientation only. |
+| `dpdp-rules-2025-pib.pdf` | DPDP Rules press release | Explanatory only, not the operative text. |
 
-## Already read — no download needed
+## Still needed
 
-- [RBI/2023-24/60 — Release of Property Documents](https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=12535&Mode=0) — `PRIMARY_VERIFIED`
-- [RBI Digital Lending Directions, 2025](https://rbi.org.in/Scripts/NotificationUser.aspx?Id=12848&Mode=0) — `PRIMARY_VERIFIED`
+| Save as | Why it matters | Priority |
+|---|---|---|
+| `registration-act-1908.pdf` (full, India Code) | The current copy is an **Indian Kanoon extract of s.17 only**, so its two requirements are recorded but **blocked**. The real gap is **s.49 — effect of non-registration**: without it the platform can detect a missing registration but cannot state its consequence, which is the part a Risk Manager acts on. | **1** |
+| `maharashtra-stamp-act-1958.pdf` (current, India Code) | Current copy is a 2019 aggregator text that self-declares it could not be verified. **No stamp-duty requirement has been extracted and none may be** until this is replaced. A Fourth Amendment in 2026 confirms the Act is actively amended. | **2** |
+| `dpdp-rules-2025-gazette.pdf` | To settle the notification date (PIB says 14 Nov 2025; earlier commentary said 13 Nov) and the commencement schedule. | 3 |
+| `mlrc-1966.pdf` | Confirm the s.282 basis for the Property Card. | 4 |
+| RERA commencement notification | s.1(3) leaves commencement to notification; the date gates the s.3(2)(b) exemption. | 4 |
+| Maharashtra RERA rules / notification | Whether the state used the s.3(2)(a) proviso to reduce the registration threshold. | 4 |
 
-## What B1 produces once unblocked
+## Rejected
 
-For each instrument: atomic requirements quoted verbatim with exact section references, an
-applicability predicate, a feasibility class (deterministic / external-verifiable /
-retrieval-assisted / LLM-assisted / human-only / out-of-scope), and an obligation kind
-(platform checks / platform must satisfy / platform tracks).
+- **A second Transfer of Property Act copy** (supplied 2026-08-24) — same aggregator as the
+  stale stamp act, marked *"version of this document from 1 January 2003"* and *"could not
+  be verified"*. The incumbent official bare-act copy was retained. Recorded in
+  `sources.yaml` so the rejection is not silently reversed.
 
-Output: `docs/regulatory/requirements.yaml`, every entry citing a `sources.yaml` id whose
-`verification_status` is `PRIMARY_VERIFIED`.
+## Checking
 
-**Rules are not authored in B1.** That is B2, and no rule is enabled without legal sign-off.
+```bash
+python tools/check_regulatory.py
+```
+
+Enforces that a requirement may only become a rule if its source is `PRIMARY_VERIFIED` and
+it is not flagged `REQUIRES_LEGAL_REVIEW`. Also fails if any PDF in `sources/` lacks a
+provenance grade — an ungraded document is an unverified document.

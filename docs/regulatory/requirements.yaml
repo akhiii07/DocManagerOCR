@@ -395,6 +395,141 @@ requirements:
       Caveat: a statutory inspection right is not the same as a documented API. It
       establishes that access is lawful, not that it is automatable. Confirm the mechanism.
 
+  # ===================================================================================
+  # Transfer of Property Act, 1882 - Chapter IV, mortgages
+  # ===================================================================================
+
+  - id: REQ_TPA_58F_MORTGAGE_BY_DEPOSIT_OF_TITLE_DEEDS
+    source: INST_TPA_1882
+    location: "Section 58(f) (PDF p24)"
+    quote: >-
+      Mortgage by deposit of title-deeds.-Where a person in any of the following towns,
+      namely, the towns of Calcutta, Madras, [and Bombay], and in any other town which the
+      [State Government concerned] may, by notification in the Official Gazette, specify in
+      this behalf, delivers to a creditor or his agent documents of title to immoveable
+      property, with intent to create a security thereon, the transaction is called a
+      mortgage by deposit of title-deeds.
+    applicability:
+      jurisdiction: [Mumbai]
+      security_type: equitable_mortgage
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    priority: HIGHEST
+    notes: >-
+      MUMBAI IS A NAMED TOWN. Equitable mortgage by deposit of title deeds is therefore
+      available here and is the dominant security mechanism for Mumbai lending. Two
+      consequences for this platform, both of which prevent false positives:
+      (1) The security is created by DELIVERY OF ORIGINAL TITLE DOCUMENTS, not by executing
+          a deed. This is why document custody inventory is a genuine system output rather
+          than bookkeeping - the originals in the lender's possession ARE the security.
+      (2) See REQ_TPA_59 - such a mortgage is expressly exempt from the registered-
+          instrument requirement.
+
+  - id: REQ_TPA_59_MORTGAGE_BY_REGISTERED_INSTRUMENT
+    source: INST_TPA_1882
+    location: "Section 59 (PDF p24)"
+    quote: >-
+      Where the principal money secured is one hundred rupees or upwards, a mortgage [other
+      than a mortgage by deposit of title-deeds] can be effected only by a registered
+      instrument signed by the mortgagor and attested by at least two witnesses. Where the
+      principal money secured is less than one hundred rupees, a mortgage may be effected
+      either by [a registered instrument] signed and attested as aforesaid, or (except in
+      the case of a simple mortgage) by delivery of the property.
+    applicability:
+      document_type: [mortgage_deed]
+      security_type: "not equitable_mortgage"
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [registration_particulars, mortgagor_signature, witness_attestation]
+    priority: HIGHEST
+    notes: >-
+      FALSE-POSITIVE CRITICAL, AND THE TRAP IS THE CARVE-OUT. The naive rule "a mortgage
+      must be registered" is WRONG for Mumbai, because s.59 expressly excludes mortgages by
+      deposit of title-deeds. Since equitable mortgage is the dominant Mumbai practice, that
+      naive rule would fire on a large share of perfectly sound cases.
+      The correct logic is conditional on security type:
+        equitable_mortgage (s.58(f))  -> registration NOT required
+        any other mortgage >= Rs.100  -> registered instrument REQUIRED, signed by the
+                                         mortgagor and attested by AT LEAST TWO WITNESSES
+      Note the two-witness attestation requirement, which is separate from registration and
+      is independently checkable from the document image.
+
+  # ===================================================================================
+  # SARFAESI Act, 2002 - Chapter IVA
+  # ===================================================================================
+
+  - id: REQ_SARFAESI_26C_PUBLIC_NOTICE_AND_PRIORITY
+    source: INST_SARFAESI_2002
+    location: "Section 26C(1) and 26C(2) (PDF p30)"
+    quote: >-
+      any registration of transactions of creation, modification or satisfaction of security
+      interest by a secured creditor or other creditor or filing of attachment orders under
+      this Chapter shall be deemed to constitute a public notice from the date and time of
+      filing of particulars of such transaction with the Central Registry ... (2) Where
+      security interest or attachment order upon any property in favour of the secured
+      creditor or any other creditor are filed for the purpose of registration under the
+      provisions of Chapter IV and this Chapter, the claim of such secured creditor or other
+      creditor holding attachment order shall have priority over any subsequent security
+      interest created ...
+    applicability:
+      verification_source: SRC_CERSAI
+    obligation_kind: platform_checks
+    feasibility: EXTERNAL_VERIFIABLE
+    priority: HIGHEST
+    notes: >-
+      THIS IS WHY THE CERSAI CHECK MATTERS, stated in legal terms. A registered prior charge
+      constitutes PUBLIC NOTICE from the moment of filing, and takes PRIORITY over any
+      subsequent security interest. A lender that does not search CERSAI cannot claim it was
+      unaware, and its own charge ranks behind anything already registered.
+      A hit on CERSAI against the subject property is therefore not an informational note -
+      it is a direct threat to the recoverability of the proposed security, and should be
+      severity CRITICAL in the finding model.
+
+  - id: REQ_SARFAESI_26D_ENFORCEMENT_REQUIRES_REGISTRATION
+    source: INST_SARFAESI_2002
+    location: "Section 26D (PDF p31)"
+    quote: >-
+      Notwithstanding anything contained in any other law for the time being in force, from
+      the date of commencement of the provisions of this Chapter, no secured creditor shall
+      be entitled to exercise the rights of enforcement of securities under Chapter III
+      unless the security interest created in its favour by the borrower has been registered
+      with the Central Registry.
+    applicability:
+      lender_type: [HFC, NBFC, bank]
+    obligation_kind: platform_tracks
+    feasibility: EXTERNAL_VERIFIABLE
+    priority: HIGH
+    notes: >-
+      COMPLETES THE MUMBAI SECURITY PICTURE. Because a Mumbai equitable mortgage is NOT
+      registered with the sub-registrar (REQ_TPA_58F / REQ_TPA_59), CERSAI filing is the
+      mechanism that supplies public notice AND unlocks enforcement. An unregistered
+      security interest leaves the lender unable to enforce under Chapter III at all.
+      This makes "has our own charge been filed with CERSAI" a post-sanction obligation the
+      platform should track per case, alongside the document custody inventory driven by
+      INST_RBI_RELEASE_DOCS_2023.
+
+  - id: REQ_SARFAESI_26E_PRIORITY_TO_SECURED_CREDITORS
+    source: INST_SARFAESI_2002
+    location: "Section 26E and its Explanation (PDF p31)"
+    quote: >-
+      Notwithstanding anything contained in any other law for the time being in force, after
+      the registration of security interest, the debts due to any secured creditor shall be
+      paid in priority over all other debts and all revenues, taxes, cesses and other rates
+      payable to the Central Government or State Government or local authority.
+      Explanation.-... on or after the commencement of the Insolvency and Bankruptcy Code,
+      2016 (31 of 2016), in cases where insolvency or bankruptcy proceedings are pending in
+      respect of secured assets of the borrower, priority to secured creditors in payment of
+      debt shall be subject to the provisions of that Code.
+    applicability:
+      lender_type: [HFC, NBFC, bank]
+    obligation_kind: platform_tracks
+    feasibility: EXTERNAL_VERIFIABLE
+    notes: >-
+      Registered security ranks ahead of government dues including municipal taxes - which
+      moderates, though does not remove, the risk from outstanding MCGM property tax found
+      via SRC_MCGM_PTAX. Priority is expressly subordinated to the IBC where insolvency
+      proceedings are pending, so the platform must not present s.26E priority as absolute.
+
 # =====================================================================================
 # NEGATIVE FINDINGS
 #
