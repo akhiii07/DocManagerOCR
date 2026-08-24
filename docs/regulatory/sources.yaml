@@ -129,31 +129,50 @@ instruments:
     issued_on: 2021-02-17
     last_updated_on: 2025-07-17
     url: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12030
+    local_copy: docs/regulatory/sources/rbi-hfc-md-2021.pdf
     retrieved_on: 2026-08-24
-    verification_status: PRIMARY_LOCATED
+    verification_status: PRIMARY_VERIFIED
     applies_to: [hfcs]
     in_scope_for_us: true
     obligation_kind: platform_checks
     priority: HIGH
+    pages: 230
+    header_confirms: >-
+      RBI/2020-21/73 DOR.FIN.HFC.CC.No.120/03.10.136/2020-21, February 17, 2021,
+      "(Updated as on July 17, 2025*)" - matches the index-page metadata recorded in B0.
     notes: >-
-      PRIMARY TARGET FOR B1. Index page read; substantive PDF not yet read. Expect
-      LTV, valuation, and collateral documentation provisions here.
+      B1 EXTRACTION DONE for LTV, valuation and disbursement. See requirements.yaml:
+      Para 19 (LTV caps and computation), Para 104 + Annex XIV (valuation policy,
+      valuer independence, two-valuation thresholds, and Annex XIV 1.9 which caps the
+      LTV property value at the documented transaction value in the agreement to sale /
+      sale deed). Negative finding recorded: NO title-verification duty in this
+      instrument.
 
   - id: INST_RBI_OUTSOURCING_IT_2023
     authority: AUTH_RBI
     title: Master Direction on Outsourcing of Information Technology Services
-    reference: null
-    issued_on: 2023
+    reference: RBI/2023-24/102
+    circular_no: DoS.CO.CSITEG/SEC.1/31.01.015/2023-24
+    issued_on: 2023-04-10
     url: https://www.rbi.org.in/scripts/BS_ViewMasDirections.aspx?id=12486
+    local_copy: docs/regulatory/sources/rbi-outsourcing-it-md-2023.pdf
     retrieved_on: 2026-08-24
-    verification_status: SECONDARY_ONLY
-    applies_to: [scheduled_commercial_banks, lab, sfb, payments_banks, ucbs, nbfcs, cics, aifis]
+    verification_status: PRIMARY_VERIFIED   # identity/metadata verified from the PDF header
+    extraction_status: PENDING              # substantive requirements not yet extracted
+    pages: 31
+    applies_to: [scheduled_commercial_banks_excl_rrbs, local_area_banks, small_finance_banks,
+                 payments_banks, ucbs, nbfcs, cics, aifis]
     hfc_applicability: UNCONFIRMED
     in_scope_for_us: true
     obligation_kind: platform_must_satisfy
     notes: >-
-      Directly relevant: this platform is an IT service. If it is hosted or operated by a
-      third party, these directions likely govern the arrangement. Confirm HFC applicability.
+      Addressee list confirmed verbatim from PDF p1. It names "Non-Banking Financial
+      Companies" but does NOT say "including Housing Finance Companies" - unlike
+      INST_RBI_RELEASE_DOCS_2023 and INST_RBI_DIGITAL_LENDING_2025, which both spell out
+      "including HFCs". That difference in drafting is exactly why HFC applicability must
+      be confirmed rather than inferred. Directly relevant: this platform IS an IT service,
+      so if it is hosted or operated by a third party these directions likely govern the
+      arrangement.
 
   - id: INST_REGISTRATION_ACT_1908
     authority: AUTH_PARLIAMENT
@@ -322,3 +341,75 @@ verification_sources:
     architectural_impact: >-
       Canonical model must use a TYPED parcel identifier (cts_number | survey_number |
       gat_number | hissa_number), not a single survey_number string.
+
+# ---------------------------------------------------------------------------------
+# PROVENANCE OF LOCAL COPIES
+#
+# A PDF sitting in sources/ is not automatically authoritative. Provenance is graded
+# per file, because a stale or aggregator-sourced copy will silently produce wrong
+# rules. Two of the uploaded files self-declare that they could not be verified.
+# ---------------------------------------------------------------------------------
+local_copy_provenance:
+
+  - file: rbi-hfc-md-2021.pdf
+    grade: AUTHORITATIVE
+    reason: Official RBI letterhead, matching reference number and update history.
+
+  - file: rbi-outsourcing-it-md-2023.pdf
+    grade: AUTHORITATIVE
+    reason: Official RBI letterhead with reference number and addressee list.
+
+  - file: transfer-of-property-act-1882.pdf
+    grade: LIKELY_AUTHORITATIVE
+    reason: Official "ARRANGEMENT OF SECTIONS" bare-act format consistent with India Code.
+
+  - file: sarfaesi-act-2002.pdf
+    grade: LIKELY_AUTHORITATIVE
+    reason: Same official bare-act format.
+
+  - file: rera-act-2016.pdf
+    grade: LIKELY_AUTHORITATIVE
+    reason: Same official bare-act format.
+
+  - file: registration-act-1908-s17.pdf
+    grade: EXTRACT_ONLY
+    reason: >-
+      Contains Section 17 alone, not the full Act, and is formatted as a third-party
+      section extract rather than the official bare Act. Sufficient to READ s.17;
+      insufficient to confirm that s.17 has not been amended, or to check
+      cross-referenced sections (s.18, s.49 on the effect of non-registration).
+    action: Obtain the full Act from India Code before authoring a registration rule.
+
+  - file: maharashtra-stamp-act-1958.pdf
+    grade: STALE_UNVERIFIED
+    reason: >-
+      Third-party aggregator copy. Page 1 states "Last Updated 4th November, 2019" and
+      carries the disclaimer "[Note: The original publication document is not available
+      and this content could not be verified.]" B0 located an India Code version marked
+      "text as on 8th April 2025" - this copy is roughly six years behind it.
+    action: >-
+      DO NOT ground any stamp-duty rule on this file. Stamp duty rates and articles are
+      exactly the provisions most likely to have changed since 2019. Replace with the
+      India Code version.
+
+  - file: mh-city-survey-rules-1969.pdf
+    grade: STALE_UNVERIFIED
+    reason: >-
+      Same aggregator and same "could not be verified" disclaimer. Also note this is the
+      City Survey RULES, whereas B0 recorded the Property Card as resting on the
+      Maharashtra Land Revenue CODE s.282 - a different instrument.
+    action: >-
+      Useful background on the City Survey/Property Card mechanism, but the Code itself
+      is still required to confirm the s.282 claim.
+
+  - file: dpdp-rules-2025-pib.pdf
+    grade: GOVERNMENT_SECONDARY
+    reason: >-
+      A PIB explanatory press release, not the Gazette notification. Authoritative as to
+      the government's own account, but it is not the operative legal text.
+    finding: >-
+      DATE CONFLICT. This PIB document states the DPDP Rules were notified on
+      "14 November 2025". The B0 authority map recorded 13 November 2025 from secondary
+      legal commentary. PIB is the better source of the two, so 14 November is now the
+      working date - but neither is the Gazette.
+    action: Obtain the Gazette notification to settle the date and the commencement schedule.

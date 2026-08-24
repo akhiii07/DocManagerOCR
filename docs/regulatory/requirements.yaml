@@ -1,0 +1,235 @@
+# B1 deliverable - atomic regulatory requirements extracted from primary instruments.
+#
+# These are REQUIREMENTS, not rules. Each is quoted verbatim from a source whose
+# verification_status in sources.yaml is PRIMARY_VERIFIED. Rule authoring is B2, and no
+# rule is enabled in production without legal sign-off.
+#
+# feasibility:
+#   DETERMINISTIC       computable from extracted fields with no judgement
+#   EXTERNAL_VERIFIABLE requires an authoritative external source
+#   RETRIEVAL_ASSISTED  needs a passage located in the documents, human-confirmed
+#   LLM_ASSISTED        model proposes, human decides; never auto-decided
+#   HUMAN_ONLY          legal judgement
+#   OUT_OF_SCOPE        organisational/process duty not evidenced in collateral documents
+#
+# obligation_kind:
+#   platform_checks        a check we run on a case
+#   platform_must_satisfy  a duty binding on this platform as a system
+#   platform_tracks        an obligation we surface and monitor
+
+schema_version: 1
+compiled_at: 2026-08-24
+status: PARTIAL - rbi-hfc-md-2021 extracted; other instruments pending
+
+requirements:
+
+  # ===================================================================================
+  # RBI HFC Master Direction, 2021 - Paragraph 19: LTV
+  # ===================================================================================
+
+  - id: REQ_HFC_19_1_LTV_CAP
+    source: INST_RBI_HFC_MD_2021
+    location: "Paragraph 19.1 (PDF p58)"
+    quote: >-
+      No housing finance company shall grant housing loans to individuals:
+      a. up to Rs.30 lakh with LTV ratio exceeding 90 per cent,
+      b. above Rs.30 lakh and up to Rs.75 lakh with LTV ratio exceeding 80 per cent, and,
+      c. above Rs.75 lakh with LTV ratio exceeding 75 per cent
+    applicability:
+      lender_type: [HFC]
+      borrower: individual
+      product: housing_loan
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [loan_amount, realizable_property_value]
+    notes: >-
+      Slab-based cap. Note the slabs are on LOAN AMOUNT, and the boundaries are inclusive
+      at the lower edge - "up to 30 lakh" and "above 30 lakh and up to 75 lakh". A rule
+      must not silently use a half-open interval at 30,00,000 or 75,00,000 exactly.
+      Applies to housing loans to individuals; LAP is NOT covered by this paragraph and
+      must not inherit these caps by assumption.
+
+  - id: REQ_HFC_19_1_LTV_COMPUTATION
+    source: INST_RBI_HFC_MD_2021
+    location: "Paragraph 19.1, Note (a) (PDF p58-59)"
+    quote: >-
+      The LTV ratio shall be computed as a percentage with total outstanding in the
+      account (viz, "principal + accrued interest + other charges pertaining to the loan"
+      without any netting) in numerator and the realizable value of the residential
+      property mortgaged to the HFC in the denominator. HFCs shall not include stamp duty,
+      registration and other documentation charges in the cost of the housing property
+      they finance so that the effectiveness of LTV norms is not diluted. However, ... in
+      cases where the cost of the house/ dwelling unit does not exceed Rs.10 lakh, HFCs
+      may add stamp duty, registration and other documentation charges to the cost of the
+      house/ dwelling unit for the purpose of computing LTV ratio.
+    applicability:
+      lender_type: [HFC]
+      product: housing_loan
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [principal, accrued_interest, other_charges, realizable_value,
+                        stamp_duty, registration_charges, house_cost]
+    notes: >-
+      Two distinct traps for a rule author. (1) The numerator is total outstanding WITHOUT
+      netting, not sanctioned principal. (2) The stamp-duty exclusion REVERSES for houses
+      costing <= Rs.10 lakh, where those charges MAY be added. A naive "always exclude
+      stamp duty" rule is wrong for the affordable-housing segment.
+
+  # ===================================================================================
+  # RBI HFC Master Direction, 2021 - Paragraph 104 + Annex XIV: valuation
+  # ===================================================================================
+
+  - id: REQ_HFC_104_VALUATION_POLICY
+    source: INST_RBI_HFC_MD_2021
+    location: "Paragraph 104 (PDF p127); Annex XIV para 1.1 (PDF p220)"
+    quote: >-
+      HFCs are required to put in place a Board approved valuation policy for putting in
+      place a system/ procedure for realistic valuation of properties/ fixed assets and
+      also for empanelment of valuers in accordance with the details contained in Annex
+      XIV. ... HFCs shall have a Board approved policy in place for valuation of
+      properties including collaterals accepted for their exposures.
+    applicability:
+      lender_type: [HFC]
+    obligation_kind: platform_tracks
+    feasibility: OUT_OF_SCOPE
+    notes: >-
+      An organisational duty on the lender, not a per-case check. Recorded because it is
+      the parent of the Annex XIV requirements below, not because we can verify it.
+
+  - id: REQ_HFC_AXIV_1_2_INDEPENDENT_VALUER
+    source: INST_RBI_HFC_MD_2021
+    location: "Annex XIV para 1.2 (PDF p220)"
+    quote: >-
+      The valuation shall be done by professionally qualified independent valuers i.e. the
+      valuer should not have a direct or indirect interest. However, valuation of
+      properties by the internal technical valuers of housing finance companies is
+      permissible subject to the internal technical valuer having qualifications similar to
+      those prescribed under the Companies (Registered Valuers and Valuation) Rules, 2017.
+    applicability:
+      lender_type: [HFC]
+    obligation_kind: platform_checks
+    feasibility: RETRIEVAL_ASSISTED
+    evidence_required: [valuer_name, valuer_qualification, valuer_independence_declaration]
+    notes: >-
+      Checkable only if the valuation report is part of the case bundle. Valuation reports
+      are NOT in the five MVP document types - flag as a scope question rather than
+      assuming they will be present.
+
+  - id: REQ_HFC_AXIV_1_5_TWO_VALUATIONS_50L
+    source: INST_RBI_HFC_MD_2021
+    location: "Annex XIV para 1.5 (PDF p220-221)"
+    quote: >-
+      HFCs shall obtain minimum two valuation reports, at least one of them being from an
+      independent valuer, in case the loan amount is Rs.50 lakh or above (or such any other
+      lower value as may be decided by the Board of the company) and below Rs.75 lakh. The
+      lower of the two valuations shall be considered by the HFC for deciding upon the loan
+      amount.
+    applicability:
+      lender_type: [HFC]
+      loan_amount: ">= 5000000 and < 7500000"
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [valuation_report_count, valuer_independence, valuation_amounts]
+    notes: >-
+      The Board may set a LOWER trigger than Rs.50 lakh. So the threshold is
+      configurable per lender, not a constant. Encode it as a policy parameter with the
+      regulatory value as the default ceiling.
+
+  - id: REQ_HFC_AXIV_1_6_TWO_VALUATIONS_75L
+    source: INST_RBI_HFC_MD_2021
+    location: "Annex XIV para 1.6 (PDF p221)"
+    quote: >-
+      In case the loan amount is Rs.75 lakh or above, HFCs shall necessarily obtain minimum
+      two independent valuation reports and the lower of the two shall be considered by the
+      HFC for deciding upon the loan amount.
+    applicability:
+      lender_type: [HFC]
+      loan_amount: ">= 7500000"
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [valuation_report_count, valuer_independence, valuation_amounts]
+    notes: >-
+      Stricter than 1.5: BOTH reports must be independent, not just one.
+
+  - id: REQ_HFC_AXIV_1_9_VALUE_NOT_ABOVE_DOCUMENTED_CONSIDERATION
+    source: INST_RBI_HFC_MD_2021
+    location: "Annex XIV para 1.9 (PDF p221)"
+    quote: >-
+      In respect of financing of any initial transaction of the purchase of a property, the
+      value of the property for the purposes of arriving at the Loan to Value ratio (LTV)
+      should not exceed the documented transaction value as per the agreement to sale, sale
+      deed etc. Valuation in such cases, if required, may be done as per the policy approved
+      by the Board of the company.
+    applicability:
+      lender_type: [HFC]
+      transaction_type: initial_purchase
+    obligation_kind: platform_checks
+    feasibility: DETERMINISTIC
+    evidence_required: [sale_consideration_agreement_of_sale, sale_consideration_sale_deed,
+                        property_value_used_for_ltv]
+    priority: HIGHEST
+    notes: >-
+      THE HIGHEST-VALUE CHECKPOINT FOUND SO FAR. It names the Agreement of Sale and Sale
+      Deed explicitly, and both are MVP document types. The consideration amount is already
+      a planned extraction field. This converts a core extraction output directly into a
+      regulatory checkpoint with no external dependency and no judgement:
+        property_value_used_for_ltv <= documented_transaction_value
+      It also gives cross-document validation a regulatory purpose rather than a merely
+      hygienic one: a consideration mismatch between the Agreement of Sale and the Sale
+      Deed is not just an inconsistency, it makes this checkpoint indeterminate.
+
+  # ===================================================================================
+  # RBI HFC Master Direction, 2021 - Appendix XII(b): MITC
+  # ===================================================================================
+
+  - id: REQ_HFC_MITC_DISBURSEMENT_CONDITIONS
+    source: INST_RBI_HFC_MD_2021
+    location: "Appendix XII(b), item 3 (PDF p216)"
+    quote: >-
+      Conditions for Disbursement of the Loan. Conditions for disbursements of the loan or
+      any installment thereof viz., creation of security, submission of approved plans,
+      stages of construction, statutory approvals etc. to be indicated.
+    applicability:
+      lender_type: [HFC]
+      product: housing_loan
+    obligation_kind: platform_tracks
+    feasibility: RETRIEVAL_ASSISTED
+    notes: >-
+      A disclosure duty about what the MITC must state, not a substantive rule about which
+      documents must exist. Do not over-read it into a documentation checklist. It does
+      usefully confirm that approved plans and statutory approvals are underwriting-relevant
+      artefacts, which supports extending document types beyond the MVP five later.
+
+# =====================================================================================
+# NEGATIVE FINDINGS
+#
+# What an instrument does NOT say is a finding, and must be recorded. Otherwise a future
+# reader assumes the search was never done and re-derives it - or worse, invents a
+# regulatory basis that does not exist.
+# =====================================================================================
+
+negative_findings:
+
+  - id: NEG_HFC_NO_TITLE_VERIFICATION_DUTY
+    source: INST_RBI_HFC_MD_2021
+    searched_for: "title deed|title search|title investigation|clear title|legal opinion|encumbrance certificate"
+    result: >-
+      One hit across 230 pages, and it concerns written legal opinions on the
+      enforceability of netting agreements for counterparty credit exposure (PDF p38).
+      Nothing about title verification, title search, legal due diligence, or encumbrance
+      certificates for collateral.
+    conclusion: >-
+      The HFC Master Direction does NOT prescribe title verification or legal due
+      diligence requirements for immovable collateral.
+    consequence: >-
+      Title-related compliance checkpoints MUST NOT cite this instrument. Their basis, if
+      any, lies elsewhere - the Transfer of Property Act and Registration Act govern the
+      validity of the instrument itself, and title due diligence is otherwise a matter of
+      the lender's own credit policy. Until that is established, title checks in this
+      platform are BUSINESS RULES, not REGULATORY CHECKPOINTS, and must be labelled as
+      such in the review package. Mislabelling a business rule as a regulatory requirement
+      would be a serious defect in an audit.
+    confidence: HIGH
+    caveat: >-
+      Negative established by keyword search over the extracted text layer, not by full
+      reading of 230 pages. Re-verify before this is relied on in a legal context.

@@ -1,5 +1,5 @@
-# ---------------------------------------------------------------------------
-# CUSTOMER DATA — NEVER COMMIT
+﻿# ---------------------------------------------------------------------------
+# CUSTOMER DATA - NEVER COMMIT
 # These patterns are a safety net, not a policy. The policy is: real customer
 # documents live outside the repo entirely. See docs/privacy/data-handling-policy.md
 # ---------------------------------------------------------------------------
@@ -13,6 +13,13 @@ samples/real/
 *.jpeg
 *.png
 !docs/**/*.png
+
+# Exception: PUBLIC regulatory instruments are kept in the repo deliberately, so that
+# every citation in requirements.yaml resolves to the exact text it was read from.
+# These are government publications with no privacy sensitivity. Customer documents
+# remain blocked by the patterns above.
+!docs/regulatory/sources/*.pdf
+!docs/regulatory/sources/*.PDF
 
 # Survey output can contain filenames; filenames can contain customer names.
 survey-output/
@@ -56,5 +63,3 @@ fixtures/
 Thumbs.db
 desktop.ini
 
-# Public regulatory PDFs - large, and not ours to redistribute
-docs/regulatory/sources/
