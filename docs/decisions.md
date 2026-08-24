@@ -226,6 +226,47 @@ requires a human.
 
 ---
 
+## ADR-0011 — Quality gate degrades rather than rejects; rejected documents stay attached
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** `REJECTED` is reserved for documents that genuinely cannot be processed:
+encrypted, unparseable, zero pages, over the page limit. Every other defect — low
+resolution, blur, partial text layer, rotation, mixed page sizes — yields `DEGRADED`:
+process, but cap confidence. A very low resolution scan is DEGRADED, not REJECTED.
+
+A `REJECTED` document is still attached to the case with its reasons.
+
+**Why.** Real collateral bundles are often poor quality. Rejecting outright pushes work
+back to a human with no explanation, and a poor scan is still evidence a reviewer may want
+to see. A silent gap in the bundle is worse than a visible failed document.
+
+**Consequences.** Downstream stages must honour `Document.confidence_capped`. The gate
+cannot be relied on to guarantee input quality — only to label it.
+
+---
+
+## ADR-0012 — Byte-level safety scan is a filter, not a security boundary
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** `sanitize.scan()` checks magic bytes and PDF capability names, blocking
+active content (`/JavaScript`, `/Launch`, `/EmbeddedFile`, `/RichMedia`, `/GoToR`,
+`/SubmitForm`). Blocked content is never stored. Format is decided by magic bytes, not by
+the filename.
+
+**Stated limitation.** A PDF can hide object definitions inside compressed object streams,
+where these names do not appear in plaintext. A determined adversary can evade this check.
+It is recorded as a cheap first filter, **not** a security boundary.
+
+**Why record the limitation rather than fix it.** The fix is not a better parser — it is
+sandboxed rendering with no network egress and never executing what a document declares.
+Those are deployment controls. Claiming this scan is protection would be worse than the
+gap itself, because it would suppress the work of building the real boundary.
+
+**Consequences.** Deployment must supply process isolation and egress control before
+production. Tracked in [OPEN-ITEMS.md](OPEN-ITEMS.md).
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |

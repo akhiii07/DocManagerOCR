@@ -17,8 +17,9 @@ platform for lending underwriting.
 | **B1** Requirement extraction | 21 requirements, 18 rule-ready, 3 blocked. |
 | **P5** Canonical data model | Done — `src/dmocr/model/`. |
 | **P6** Rule engine + findings | Done — `src/dmocr/rules/`, 8 rules, all `DRAFT`. |
-| Tests | 84 passing. |
-| Next | Ingestion + quality gate, then OCR/extraction |
+| **P1** Ingestion + quality gate | Done — `src/dmocr/ingest/`. |
+| Tests | 131 passing. |
+| Next | Classification, then OCR/extraction |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -43,12 +44,14 @@ during development. See [docs/privacy/data-handling-policy.md](docs/privacy/data
 ```
 src/dmocr/model/                  canonical data model (claims, not fields)
 src/dmocr/rules/                  rule engine (policy in YAML, computation in Python)
+src/dmocr/ingest/                 upload → safety scan → store → quality gate
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
 docs/
   decisions.md                    architecture decision record
   canonical-model.md              why the model has this shape
   rule-engine.md                  how rules are authored, gated and evaluated
+  ingestion.md                    the quality gate and what it deliberately does not do
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally

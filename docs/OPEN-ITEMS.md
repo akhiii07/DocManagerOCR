@@ -42,6 +42,9 @@ will be supplied if and when they become available.
 | 14 | **Temporal vs lightweight queue** | ADR open decision O2. Decide when the human-wait-state load in the verification layer is visible. |
 | 15 | **PyMuPDF (AGPL) licensing** | ADR open decision O3. Raise with legal before adopting; `pypdfium2` used meanwhile. |
 | 16 | **RBI Outsourcing of IT Services MD extraction** | File held. Confirm HFC applicability first — its addressee list says "NBFCs" *without* the "including HFCs" wording the other two RBI instruments use, so it cannot be inferred. |
+| 18 | **Sandboxed rendering + egress control for uploads** | ADR-0012. The byte-level safety scan is a filter, not a security boundary. Real protection is process isolation with no network egress, plus virus scanning. Required before production, not before more building. |
+| 19 | **Re-tune `QualityThresholds.min_sharpness`** | Default of 60 is a placeholder. Laplacian variance is corpus-relative, so it needs the p10 from a real corpus survey. Depends on item 8. |
+| 20 | **Page-level routing for `MIXED` text-layer documents** | The gate flags them; nothing acts on it yet. Needs the extraction stage. |
 | 17 | **SARFAESI s.23 filing time limit** | The commonly cited "30 days" is not in the text we hold; the provision carries amendment markers. Not encoded. |
 
 ---
