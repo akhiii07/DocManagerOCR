@@ -20,8 +20,9 @@ platform for lending underwriting.
 | **P1** Ingestion + quality gate | Done — `src/dmocr/ingest/`. |
 | **P2** OCR + text layer | Done — `src/dmocr/ocr/`, per-page routing, RapidOCR. |
 | **P3** Classification | Done — `src/dmocr/classify/`, rule-based baseline. |
-| Tests | 212 passing. |
-| Next | Structured extraction |
+| **P4** Structured extraction | Done — `src/dmocr/extract/`, deterministic + grounding. |
+| Tests | 300 passing. |
+| Next | Cross-document validation wiring, then external verification |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -49,6 +50,7 @@ src/dmocr/rules/                  rule engine (policy in YAML, computation in Py
 src/dmocr/ingest/                 upload → safety scan → store → quality gate
 src/dmocr/ocr/                    text layer + OCR, routed per page
 src/dmocr/classify/               which extraction schema applies
+src/dmocr/extract/                schemas, finders, span grounding -> claims
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
 docs/
@@ -58,6 +60,7 @@ docs/
   ingestion.md                    the quality gate and what it deliberately does not do
   ocr.md                          per-page routing, coordinates, and what is unmeasured
   classification.md               the cross-reference problem, and why UNKNOWN is a feature
+  extraction.md                   grounding, Indian conventions, what real OCR taught us
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally
@@ -129,5 +132,10 @@ plumbing — routing, coordinates, caching, provenance, rule gating — but it s
 about accuracy on real Mumbai documents.
 
 There are no OCR, classification or extraction accuracy numbers, and there will not be
-until the real corpus is available. See items 8, 22, 23 and 24 in
+until the real corpus is available. See items 8, 22, 23, 24 and 28 in
 [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
+
+Running one real recogniser over one generated page already found four pattern bugs — OCR
+drops word boundaries, and every whitespace-dependent pattern failed on it. That is the
+clearest available evidence that extraction quality cannot be assessed on synthetic data.
+See [docs/extraction.md](docs/extraction.md).

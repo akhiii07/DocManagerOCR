@@ -117,9 +117,10 @@ def scanned_pdf(path: Path, pages: int, blur: float, dpi: int) -> None:
 OCR_FIXTURE_LINES: list[str] = [
     "DEED OF SALE",
     "",
-    "This Deed of Sale is made at Mumbai on the 14th day of",
-    "March 2024 BETWEEN Ramesh Patil, the VENDOR, of the One",
-    "Part AND Anita Desai, the PURCHASER, of the Other Part.",
+    "This Deed of Sale is executed at Mumbai on the 14th day of",
+    "March 2024 BETWEEN Ramesh Patil, hereinafter called the",
+    "VENDOR, of the One Part AND Anita Desai, hereinafter",
+    "called the PURCHASER, of the Other Part.",
     "",
     "Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai.",
     "Carpet Area: 1150 sq. ft.",

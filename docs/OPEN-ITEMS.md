@@ -51,6 +51,10 @@ will be supplied if and when they become available.
 | 24 | **Devanagari OCR untested** | The bundled PP-OCR models claim multi-script support, but no Marathi document has been through this pipeline. Relates to item 21. |
 | 25 | **Reading order is crude** | Blocks sort top-to-bottom then left-to-right, which is wrong for multi-column layouts. Needs layout analysis, not a tweak to the sorter. |
 | 26 | **OCR cache holds customer text** | `FileOcrCache` entries contain extracted document text. The cache directory must sit outside the repo, out of off-machine backups, and under the retention policy. Same class of control as the content store. |
+| 28 | **No extraction accuracy numbers (precision/recall per field)** | Deterministic finders are tested for behaviour, not accuracy. Real numbers need a labelled corpus. Depends on item 8. |
+| 29 | **Model-based extraction not built** | Semantic fields — title chain recitals, restrictive covenants, encumbrance narratives — need a VLM/LLM extractor. It slots in behind the same `FieldFinder` interface and is subject to the same span-grounding control. Needs GPU (item 3 of scope). |
+| 30 | **Entity resolution not built** | Name/address matching across documents is a scored operation needing transliteration handling and its own adversarial evaluation set. `Party.name_variants` records surface forms meanwhile. |
+| 31 | **OCR word-boundary loss degrades party extraction** | Real OCR returned `BETWEENRameshPatil` glued together. Patterns were made whitespace-tolerant, but a name whose internal space is lost extracts as `rameshpatil`. Needs a word splitter or a model extractor; not worth contorting regexes for. |
 | 27 | **CPU-only OCR** | onnxruntime here has no GPU provider (~4 s/page). GPU needs a different onnxruntime build. Fine for pilot volumes; revisit against the throughput target. |
 | 17 | **SARFAESI s.23 filing time limit** | The commonly cited "30 days" is not in the text we hold; the provision carries amendment markers. Not encoded. |
 
