@@ -21,6 +21,13 @@ tools = [
 dev = [
     "pytest>=8.0",
 ]
+# OCR. RapidOCR is an ONNX packaging of the PP-OCR models. See ADR-0013:
+# paddlepaddle publishes no wheels for Python 3.14, and rapidocr-onnxruntime bundles
+# its models in the wheel rather than downloading them at runtime, which matters under
+# the no-egress privacy constraint.
+ocr = [
+    "rapidocr-onnxruntime>=1.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -28,3 +35,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "slow: exercises a real OCR engine; skipped automatically if none is installed",
+]

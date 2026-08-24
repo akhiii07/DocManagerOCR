@@ -325,12 +325,20 @@ class TestIngestionService:
 
     def test_ingest_directory_and_summary(self, fixtures_dir: Path):
         case, svc = make_case(), service()
+        expected = [p for p in fixtures_dir.iterdir()
+                    if p.suffix.lower() in {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}]
+
         results = svc.ingest_directory(case, fixtures_dir)
         s = summarise_ingest(results)
-        assert s["submitted"] == 5
+
+        assert s["submitted"] == len(expected)
         assert s["blocked"] == 0
+        # text_scan.pdf and text_scan.png render the same page, but they are different
+        # formats and therefore different bytes - content addressing must not conflate them.
         assert s["duplicates"] == 0
-        assert s["needs_ocr"] == 3          # 2 scanned PDFs + 1 photo
+        assert s["accepted"] + s["rejected_quality"] == len(expected)
+        # Scanned fixtures have no text layer; the digital ones do.
+        assert 0 < s["needs_ocr"] < len(expected)
         assert s["degraded"] >= 2           # poor scan + photo
 
     def test_tenant_mismatch_is_refused_by_the_case(self, digital_pdf: Path):

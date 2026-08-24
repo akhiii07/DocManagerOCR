@@ -18,9 +18,10 @@ platform for lending underwriting.
 | **P5** Canonical data model | Done — `src/dmocr/model/`. |
 | **P6** Rule engine + findings | Done — `src/dmocr/rules/`, 8 rules, all `DRAFT`. |
 | **P1** Ingestion + quality gate | Done — `src/dmocr/ingest/`. |
+| **P2** OCR + text layer | Done — `src/dmocr/ocr/`, per-page routing, RapidOCR. |
 | **P3** Classification | Done — `src/dmocr/classify/`, rule-based baseline. |
-| Tests | 167 passing. |
-| Next | OCR (unblocks scanned documents), then extraction |
+| Tests | 212 passing. |
+| Next | Structured extraction |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -46,6 +47,7 @@ during development. See [docs/privacy/data-handling-policy.md](docs/privacy/data
 src/dmocr/model/                  canonical data model (claims, not fields)
 src/dmocr/rules/                  rule engine (policy in YAML, computation in Python)
 src/dmocr/ingest/                 upload → safety scan → store → quality gate
+src/dmocr/ocr/                    text layer + OCR, routed per page
 src/dmocr/classify/               which extraction schema applies
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
@@ -54,13 +56,11 @@ docs/
   canonical-model.md              why the model has this shape
   rule-engine.md                  how rules are authored, gated and evaluated
   ingestion.md                    the quality gate and what it deliberately does not do
+  ocr.md                          per-page routing, coordinates, and what is unmeasured
   classification.md               the cross-reference problem, and why UNKNOWN is a feature
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally
-  regulatory/
-    authority-map.md              B0 deliverable — who governs what, human-readable
-    sources.yaml                  B0 deliverable — machine-readable source register
   regulatory/
     authority-map.md              B0 — who governs what, human-readable
     sources.yaml                  B0 — machine-readable source register + provenance
@@ -92,7 +92,7 @@ rule-ready and why.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[tools,dev]"
+.venv/Scripts/python.exe -m pip install -e ".[tools,dev,ocr]"
 ```
 
 ```bash
@@ -119,11 +119,15 @@ python tools/make_fixtures.py fixtures
 python tools/corpus_survey.py fixtures --out survey-output --show-names
 ```
 
-Verified to exercise all three classification paths: `DIGITAL`, `MIXED`, `SCANNED`.
+Fixtures cover every text-layer path (`DIGITAL`, `MIXED`, `SCANNED`), a good and a poor
+scan, a phone photo, and a page of rendered text for exercising OCR end to end.
 
-## Next steps
+## The binding constraint
 
-- **P0**: run the corpus survey against the real Mumbai/Maharashtra document set
-  *(blocked — corpus not yet available)*
-- **B1**: requirement extraction from the instruments in `docs/regulatory/sources.yaml`,
-  starting with the HFC Master Direction *(unblocked)*
+Everything above is tested against **synthetic fixtures**. That is enough to prove the
+plumbing — routing, coordinates, caching, provenance, rule gating — but it says nothing
+about accuracy on real Mumbai documents.
+
+There are no OCR, classification or extraction accuracy numbers, and there will not be
+until the real corpus is available. See items 8, 22, 23 and 24 in
+[docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).

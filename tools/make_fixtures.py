@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
 except ImportError:  # pragma: no cover
     sys.exit("Pillow required: pip install -r tools/requirements.txt")
 
@@ -112,6 +112,78 @@ def scanned_pdf(path: Path, pages: int, blur: float, dpi: int) -> None:
     )
 
 
+#: Invented text for the OCR fixture. Deliberately uses the vocabulary the classifier
+#: keys on, so one fixture exercises OCR -> classification together.
+OCR_FIXTURE_LINES: list[str] = [
+    "DEED OF SALE",
+    "",
+    "This Deed of Sale is made at Mumbai on the 14th day of",
+    "March 2024 BETWEEN Ramesh Patil, the VENDOR, of the One",
+    "Part AND Anita Desai, the PURCHASER, of the Other Part.",
+    "",
+    "Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai.",
+    "Carpet Area: 1150 sq. ft.",
+    "Consideration: Rs. 1,25,00,000",
+]
+
+
+def _font(size: int):
+    """A real TrueType font if one is available; PIL's bitmap default otherwise.
+
+    The default font is tiny and renders text OCR cannot read, so fixture usefulness
+    depends on finding a scalable font.
+    """
+    for name in ("arial.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf",
+                 "C:/Windows/Fonts/arial.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def text_page(width: int, height: int, lines: list[str], dpi: int,
+              blur: float = 0.0) -> "Image.Image":
+    """A page of readable rendered text, for exercising OCR."""
+    im = Image.new("RGB", (width, height), "white")
+    d = ImageDraw.Draw(im)
+    title_font = _font(int(dpi * 0.34))
+    body_font = _font(int(dpi * 0.19))
+
+    y = int(dpi * 0.8)
+    for i, line in enumerate(lines):
+        if not line:
+            y += int(dpi * 0.22)
+            continue
+        font = title_font if i == 0 else body_font
+        d.text((int(dpi * 0.8), y), line, fill=(15, 15, 15), font=font)
+        y += int(dpi * (0.46 if i == 0 else 0.32))
+
+    if blur:
+        im = im.filter(ImageFilter.GaussianBlur(blur))
+    im.info["dpi"] = (dpi, dpi)
+    return im
+
+
+def _make_mixed(path: Path, *, digital: Path, scanned: Path) -> None:
+    """Concatenate a digital-text PDF and a scanned one into a single document."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:
+        print("  (skipping mixed_bundle.pdf: pypdfium2 not installed)")
+        return
+
+    dst = pdfium.PdfDocument.new()
+    for src_path in (digital, scanned):
+        src = pdfium.PdfDocument(str(src_path))
+        try:
+            dst.import_pages(src, list(range(len(src))))
+        finally:
+            src.close()
+    dst.save(str(path))
+    dst.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Generate synthetic document fixtures.")
     ap.add_argument("out", nargs="?", default="fixtures", help="Output directory")
@@ -134,6 +206,24 @@ def main(argv: list[str] | None = None) -> int:
     scan_page(1240, 1754, blur=1.0, dpi=150).save(
         out / "possession_photo.jpg", dpi=(150, 150)
     )
+
+    # Readable rendered text, for exercising OCR end to end. Scanned (no text layer),
+    # so it must go through the OCR path to be classifiable at all.
+    dpi = 200
+    px = (int(A4_INCHES[0] * dpi), int(A4_INCHES[1] * dpi))
+    text_page(*px, OCR_FIXTURE_LINES, dpi).save(
+        out / "text_scan.pdf", resolution=float(dpi)
+    )
+    text_page(*px, OCR_FIXTURE_LINES, dpi).save(
+        out / "text_scan.png", dpi=(dpi, dpi)
+    )
+
+    # A genuinely MIXED document: digital text pages with a scanned annexure appended.
+    # This is the ordinary shape of a real collateral bundle and the case that forces
+    # per-PAGE routing between text-layer extraction and OCR.
+    _make_mixed(out / "mixed_bundle.pdf",
+                digital=out / "digital_short.pdf",
+                scanned=out / "text_scan.pdf")
 
     names = sorted(p.name for p in out.iterdir())
     print(f"Wrote {len(names)} fixtures to {out}:")

@@ -43,3 +43,15 @@ def poor_scan_pdf(fixtures_dir: Path) -> Path:
 @pytest.fixture(scope="session")
 def photo_jpg(fixtures_dir: Path) -> Path:
     return fixtures_dir / "possession_photo.jpg"
+
+
+@pytest.fixture(scope="session")
+def text_scan_pdf(fixtures_dir: Path) -> Path:
+    """Rendered, readable text with no text layer - the OCR path."""
+    return fixtures_dir / "text_scan.pdf"
+
+
+@pytest.fixture(scope="session")
+def mixed_bundle_pdf(fixtures_dir: Path) -> Path:
+    """Digital text pages with a scanned annexure appended - forces per-page routing."""
+    return fixtures_dir / "mixed_bundle.pdf"

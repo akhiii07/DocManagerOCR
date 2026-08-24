@@ -44,9 +44,14 @@ will be supplied if and when they become available.
 | 16 | **RBI Outsourcing of IT Services MD extraction** | File held. Confirm HFC applicability first — its addressee list says "NBFCs" *without* the "including HFCs" wording the other two RBI instruments use, so it cannot be inferred. |
 | 18 | **Sandboxed rendering + egress control for uploads** | ADR-0012. The byte-level safety scan is a filter, not a security boundary. Real protection is process isolation with no network egress, plus virus scanning. Required before production, not before more building. |
 | 19 | **Re-tune `QualityThresholds.min_sharpness`** | Default of 60 is a placeholder. Laplacian variance is corpus-relative, so it needs the p10 from a real corpus survey. Depends on item 8. |
-| 20 | **Page-level routing for `MIXED` text-layer documents** | The gate flags them; nothing acts on it yet. Needs the extraction stage. |
+| ~~20~~ | ~~Page-level routing for `MIXED` documents~~ | **Closed 2026-08-24** by `dmocr.ocr.service` — routing is per page, tested on `mixed_bundle.pdf`. |
 | 21 | **Validate the Marathi classification lexicon** | `src/dmocr/classify/signals.py` carries Devanagari terms (खरेदीखत, करारनामा, मालमत्ता कर, ताबा, गहाण) at deliberately low weights, so they corroborate but cannot decide a classification alone. **Not checked against real Maharashtra instruments by a Marathi reader.** Needs review before weights go up. Disable with `ClassifierConfig(use_devanagari=False)`. |
 | 22 | **No classification accuracy numbers** | Tests pin behaviour, not accuracy — there is no labelled corpus to measure against. Depends on item 8. |
+| 23 | **No OCR accuracy measurement (CER/WER)** | RapidOCR reads a cleanly *rendered* fixture at ~0.88 confidence. That is the easiest possible input — no scanner noise, skew, stamps or handwriting. Real accuracy needs ground truth from the corpus. Depends on item 8. |
+| 24 | **Devanagari OCR untested** | The bundled PP-OCR models claim multi-script support, but no Marathi document has been through this pipeline. Relates to item 21. |
+| 25 | **Reading order is crude** | Blocks sort top-to-bottom then left-to-right, which is wrong for multi-column layouts. Needs layout analysis, not a tweak to the sorter. |
+| 26 | **OCR cache holds customer text** | `FileOcrCache` entries contain extracted document text. The cache directory must sit outside the repo, out of off-machine backups, and under the retention policy. Same class of control as the content store. |
+| 27 | **CPU-only OCR** | onnxruntime here has no GPU provider (~4 s/page). GPU needs a different onnxruntime build. Fine for pilot volumes; revisit against the throughput target. |
 | 17 | **SARFAESI s.23 filing time limit** | The commonly cited "30 days" is not in the text we hold; the provision carries amendment markers. Not encoded. |
 
 ---

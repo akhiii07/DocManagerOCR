@@ -267,6 +267,38 @@ production. Tracked in [OPEN-ITEMS.md](OPEN-ITEMS.md).
 
 ---
 
+## ADR-0013 — RapidOCR (ONNX PP-OCR) instead of PaddleOCR
+**Date:** 2026-08-24 · **Status:** Accepted · **Supersedes:** the OCR recommendation in the
+initial technology direction
+
+**Decision.** Use `rapidocr-onnxruntime` — an ONNX packaging of the PP-OCR models — as the
+default engine, behind the `OcrEngine` ABC.
+
+**Why the original recommendation failed.** I recommended PaddleOCR. It is not installable
+here: **paddlepaddle publishes no wheels for Python 3.14** (`pip` reports "from versions:
+none"). This is an environment fact, not a preference.
+
+**Why this package specifically.** There are two RapidOCR distributions:
+- `rapidocr-onnxruntime` (1.2.x) — **bundles the models in the wheel**
+- `rapidocr` (3.x) — downloads models at runtime, and pulls in `requests`
+
+Under the no-egress privacy constraint, runtime model downloads are outbound network
+activity on a machine that is supposed to have none. The self-contained wheel is the
+requirement, not a convenience.
+
+**Alternatives.** Tesseract (weaker on degraded scans); docTR (heavier dependency tree);
+downgrading the project to Python 3.11 to reach paddlepaddle (rejected — the engine is
+replaceable, the interpreter version is not a good thing to pin to an optional dependency).
+
+**Consequences.** CPU-only via onnxruntime as installed; ~4 s/page on the test fixture. GPU
+execution needs a different onnxruntime build. Accuracy on real Indian legal documents is
+**unmeasured** — see OPEN-ITEMS. Swapping engines touches one adapter.
+
+**Revisit when:** GPU hardware is available, or a real corpus shows PP-OCR underperforming
+on Mumbai deeds.
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |
