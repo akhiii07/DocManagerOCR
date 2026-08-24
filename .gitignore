@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# CUSTOMER DATA — NEVER COMMIT
+# These patterns are a safety net, not a policy. The policy is: real customer
+# documents live outside the repo entirely. See docs/privacy/data-handling-policy.md
+# ---------------------------------------------------------------------------
+corpus/
+documents/
+samples/real/
+*.pdf
+*.tif
+*.tiff
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+
+# Survey output can contain filenames; filenames can contain customer names.
+survey-output/
+*.survey.json
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# ---------------------------------------------------------------------------
+# Local machine state
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+fixtures/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
