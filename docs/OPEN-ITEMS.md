@@ -45,6 +45,8 @@ will be supplied if and when they become available.
 | 18 | **Sandboxed rendering + egress control for uploads** | ADR-0012. The byte-level safety scan is a filter, not a security boundary. Real protection is process isolation with no network egress, plus virus scanning. Required before production, not before more building. |
 | 19 | **Re-tune `QualityThresholds.min_sharpness`** | Default of 60 is a placeholder. Laplacian variance is corpus-relative, so it needs the p10 from a real corpus survey. Depends on item 8. |
 | 20 | **Page-level routing for `MIXED` text-layer documents** | The gate flags them; nothing acts on it yet. Needs the extraction stage. |
+| 21 | **Validate the Marathi classification lexicon** | `src/dmocr/classify/signals.py` carries Devanagari terms (खरेदीखत, करारनामा, मालमत्ता कर, ताबा, गहाण) at deliberately low weights, so they corroborate but cannot decide a classification alone. **Not checked against real Maharashtra instruments by a Marathi reader.** Needs review before weights go up. Disable with `ClassifierConfig(use_devanagari=False)`. |
+| 22 | **No classification accuracy numbers** | Tests pin behaviour, not accuracy — there is no labelled corpus to measure against. Depends on item 8. |
 | 17 | **SARFAESI s.23 filing time limit** | The commonly cited "30 days" is not in the text we hold; the provision carries amendment markers. Not encoded. |
 
 ---
