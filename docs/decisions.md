@@ -105,18 +105,20 @@ capture and audit. A source moving from T4 to T1 later is a config change.
 
 **Observations.** Three distinct failure modes across four hosts:
 
-| Host | Result |
-|---|---|
-| `maharera.maharashtra.gov.in` | connection reset |
-| `igrmaharashtra.gov.in` | connection reset |
-| `rbidocs.rbi.org.in` (PDF host) | HTTP "Request Rejected" — WAF block with support ID |
-| `www.rbi.org.in` (HTML notifications) | **works** |
-| `indiacode.nic.in` | **works** |
+| Host | What it holds | Result |
+|---|---|---|
+| `www.rbi.org.in` (HTML notifications) | circulars as web pages | **works** — 2 instruments read in full |
+| `rbidocs.rbi.org.in` | every Master Direction, as PDF | WAF "Request Rejected" |
+| `indiacode.nic.in` | every central and state Act, as PDF | HTTP 403 Forbidden |
+| `maharera.maharashtra.gov.in` | RERA project records | connection reset |
+| `igrmaharashtra.gov.in` | registration records, Index II | connection reset |
 
-The split matters: RBI's HTML notification pages are readable, but RBI's **PDF host is
-blocked**. Every Master Direction lives on the blocked host. So B0 (identify instruments,
-read HTML circulars) succeeded, while B1 (read the full text of Master Directions) cannot
-proceed from here.
+The pattern: **HTML circulars are readable; every PDF-hosted primary instrument is not.**
+Search engines can see these documents, but direct retrieval is blocked.
+
+This is why B0 succeeded and B1 cannot proceed from this environment. B0 needed to
+*identify* instruments and read a few HTML circulars. B1 needs the *full text* of Master
+Directions and Acts, and all of those are PDFs on blocked hosts.
 
 **Consequence for B1 — this is a live blocker, not a caveat.** Deep reading of primary
 instruments requires the PDFs to be fetched by other means. These are **public regulatory
