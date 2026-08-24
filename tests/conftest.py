@@ -55,3 +55,12 @@ def text_scan_pdf(fixtures_dir: Path) -> Path:
 def mixed_bundle_pdf(fixtures_dir: Path) -> Path:
     """Digital text pages with a scanned annexure appended - forces per-page routing."""
     return fixtures_dir / "mixed_bundle.pdf"
+
+
+@pytest.fixture(scope="session")
+def bundle_dir(fixtures_dir: Path) -> Path:
+    """Three documents describing ONE property, with a deliberate area conflict.
+
+    All carry a text layer, so cross-document tests need no OCR and stay fast.
+    """
+    return fixtures_dir / "bundle"

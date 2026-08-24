@@ -166,6 +166,76 @@ def text_page(width: int, height: int, lines: list[str], dpi: int,
     return im
 
 
+def lines_pdf(path: Path, lines: list[str]) -> None:
+    """A single-page PDF with a real text layer containing exactly `lines`.
+
+    Used for the cross-document bundle: a text layer means no OCR is needed, so
+    multi-document tests stay fast and deterministic.
+    """
+    body_lines = ["BT /F1 11 Tf 50 780 Td"]
+    for line in lines:
+        safe = line.replace("\\", "").replace("(", "").replace(")", "")
+        body_lines.append(f"({safe}) Tj 0 -20 Td".encode().decode())
+    body_lines.append("ET")
+    body = "\n".join(body_lines).encode()
+
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(body) + body + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    buf = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for n, obj in enumerate(objs, 1):
+        offsets.append(len(buf))
+        buf += f"{n} 0 obj\n".encode() + obj + b"\nendobj\n"
+    xref = len(buf)
+    buf += f"xref\n0 {len(objs) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for off in offsets:
+        buf += f"{off:010d} 00000 n \n".encode()
+    buf += (f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref}\n%%EOF\n").encode()
+    path.write_bytes(bytes(buf))
+
+
+#: A three-document bundle describing ONE property. The tax bill deliberately states a
+#: different area, so cross-document validation has a real conflict to surface.
+BUNDLE: dict[str, list[str]] = {
+    "bundle_sale_deed.pdf": [
+        "DEED OF SALE",
+        "This Deed of Sale is executed at Mumbai on the 14th day of March 2024",
+        "BETWEEN Shri Ramesh Patil, hereinafter called the VENDOR, of the One Part",
+        "AND Smt. Anita Desai, hereinafter called the PURCHASER, of the Other Part.",
+        "Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai 400058.",
+        "Carpet Area: 1150 sq. ft.",
+        "Consideration: Rs. 1,25,00,000/- Rupees One Crore Twenty Five Lakh only",
+        "Registration No. BDR-4/3321/2024 before the Sub-Registrar Andheri",
+    ],
+    "bundle_agreement.pdf": [
+        "AGREEMENT FOR SALE",
+        "This Agreement for Sale is executed at Mumbai on the 2nd day of January 2024",
+        "BETWEEN R. Patil, hereinafter called the PROMOTER, of the One Part",
+        "AND Anita Dessai, hereinafter called the ALLOTTEE, of the Other Part.",
+        "Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai 400058.",
+        "Carpet Area: 1150 sq. ft.",
+        "Consideration: Rs. 1,25,00,000/- Rupees One Crore Twenty Five Lakh only",
+        "MahaRERA Registration P51900012345",
+    ],
+    "bundle_property_tax.pdf": [
+        "MUNICIPAL CORPORATION OF GREATER MUMBAI",
+        "PROPERTY TAX BILL",
+        "Assessment Number: A-1234567890",
+        "Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai 400058.",
+        "Carpet Area: 980 sq. ft.",
+        "Rateable Value: Rs. 45,000/-",
+        "Bill Period 2024-2025",
+    ],
+}
+
+
 def _make_mixed(path: Path, *, digital: Path, scanned: Path) -> None:
     """Concatenate a digital-text PDF and a scanned one into a single document."""
     try:
@@ -225,6 +295,12 @@ def main(argv: list[str] | None = None) -> int:
     _make_mixed(out / "mixed_bundle.pdf",
                 digital=out / "digital_short.pdf",
                 scanned=out / "text_scan.pdf")
+
+    # Cross-document bundle, in its own directory so it can be ingested as one case.
+    bundle_dir = out / "bundle"
+    bundle_dir.mkdir(exist_ok=True)
+    for name, lines in BUNDLE.items():
+        lines_pdf(bundle_dir / name, lines)
 
     names = sorted(p.name for p in out.iterdir())
     print(f"Wrote {len(names)} fixtures to {out}:")

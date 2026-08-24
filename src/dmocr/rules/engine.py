@@ -127,13 +127,16 @@ class RuleEngine:
 
     @staticmethod
     def _render(rule: RuleSpec, outcome: PredicateOutcome) -> str:
-        if not rule.message:
-            return outcome.evidence.note or ""
+        # A rule's `message` describes the FAILURE. For a non-adverse outcome the
+        # predicate's own note is the right text - "not applicable because X", "could not
+        # be computed because Y" - and the failure template would not apply anyway.
+        if not rule.message or not outcome.determination.is_adverse:
+            return outcome.evidence.note or rule.title
         try:
             return rule.message.format(**outcome.message_vars)
         except KeyError as exc:
-            # A template referring to a variable the predicate does not supply is an
-            # authoring bug. Degrade to the evidence note rather than losing the finding.
+            # An adverse outcome whose predicate did not supply a template variable IS an
+            # authoring bug. Degrade to the note rather than losing the finding, but say so.
             log.warning("rule %s message missing var %s", rule.rule_id, exc)
             return outcome.evidence.note or rule.title
 

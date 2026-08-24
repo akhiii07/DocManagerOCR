@@ -299,6 +299,32 @@ on Mumbai deeds.
 
 ---
 
+## ADR-0014 — One canonical property per case; parties merge only on a clear name match
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** Case assembly attaches every document's claims to a **single** `Property`.
+Party claims attach to both the property and a resolved `Party`. Two parties merge only on
+`MATCH`; a `PARTIAL_MATCH` keeps them separate and records the decision.
+
+**Why one property.** Documents asserting different identifiers or areas then produce
+competing claims on the same attribute, which resolve to `MISMATCH` and surface as a
+finding. Splitting into separate properties on disagreement would make the disagreement
+vanish into two tidy entities that never get compared, and the case would look clean.
+
+**Why the merge asymmetry.** False merging is the more dangerous error: treating two
+different people as one can make a broken title chain look continuous. Splitting one person
+in two merely raises a spurious mismatch a reviewer can dismiss. So the uncertain band
+routes to a human rather than deciding.
+
+**Consequences.** Every resolution decision is recorded for audit. Match thresholds are
+uncalibrated starting points — see OPEN-ITEMS 33.
+
+**Bug this decision corrected:** party claims initially attached only to `Party` entities,
+so ownership checks — which resolve against the property — reported "no instrument capable
+of transferring title names an owner" on a case containing a Sale Deed.
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |
