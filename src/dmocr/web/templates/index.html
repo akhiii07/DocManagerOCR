@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collateral Document Review</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Collateral Document Review</h1>
+    <p class="sub">NBFC / HFC &middot; Mumbai, Maharashtra &middot; decision support for a Risk Manager</p>
+  </div>
+  <div class="header-actions">
+    {% if rules_version %}<span class="pill">rules {{ rules_version }}</span>{% endif %}
+    <button id="reset" class="ghost">Start over</button>
+  </div>
+</header>
+
+<p class="banner">
+  Every rule is still <strong>DRAFT</strong> pending legal sign-off, so findings below are
+  <strong>advisory</strong>. They are not compliance decisions, and the Risk Manager remains
+  the final authority.
+</p>
+
+<main>
+  <!-- ================= DOCUMENTS ================= -->
+  <section id="documents">
+    <h2>Documents</h2>
+    <p class="hint">Click a box to attach the document it names.</p>
+    <div id="boxes">
+      {% for box in boxes %}
+      <article class="box" data-box="{{ box.key }}" data-status="empty">
+        <div class="box-head">
+          <span class="box-title">{{ box.label }}</span>
+          {% if box.required %}<span class="req">required</span>{% endif %}
+          <span class="badge"></span>
+        </div>
+        <div class="dropzone">
+          <span class="dz-text">Click or drop a file</span>
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" hidden>
+        </div>
+        <div class="box-body"></div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ================= CASE REVIEW ================= -->
+  <section id="review">
+    <h2>Case review</h2>
+    <p class="hint">
+      Updates as documents arrive. Cross-document checks need at least two documents &mdash;
+      a single source cannot corroborate itself.
+    </p>
+    <div id="summary" class="summary"></div>
+    <div id="findings"></div>
+    <details id="notes-wrap">
+      <summary>Processing notes</summary>
+      <ul id="notes"></ul>
+    </details>
+  </section>
+</main>
+
+<!-- ================= EVIDENCE ================= -->
+<div id="evidence" class="modal" hidden>
+  <div class="modal-inner">
+    <div class="modal-head">
+      <span id="evidence-title"></span>
+      <button id="evidence-close" class="ghost">Close</button>
+    </div>
+    <img id="evidence-img" alt="Region of the page this value was read from">
+    <p class="hint">The red outline marks exactly what was read.</p>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

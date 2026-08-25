@@ -28,9 +28,20 @@ dev = [
 ocr = [
     "rapidocr-onnxruntime>=1.2",
 ]
+# Review UI. No build step, no npm, no CDN - a no-egress deployment cannot fetch a
+# frontend framework at runtime.
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"dmocr.web" = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

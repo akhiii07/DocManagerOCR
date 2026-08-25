@@ -25,8 +25,9 @@ platform for lending underwriting.
 | **P8** Verification orchestrator | Done — `src/dmocr/verify/`, planner + T4 task queue. |
 | **P9** Verification-aware rules | Done — external results become findings. |
 | **P10** Evaluation harness | Done — `src/dmocr/eval/`, metrics that don't reward guessing. |
-| Tests | 493 passing. |
-| Next | Risk Manager review UI |
+| **P12** Review UI | Done — `src/dmocr/web/`, upload boxes + findings + evidence crops. |
+| Tests | 523 passing. |
+| Next | Per-field accept/correct, operator task list |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -58,6 +59,7 @@ src/dmocr/extract/                schemas, finders, span grounding -> claims
 src/dmocr/resolve/                entity resolution + case assembly
 src/dmocr/verify/                 source planning, adapters, operator tasks, comparison
 src/dmocr/eval/                   ground truth, metrics, regression gates
+src/dmocr/web/                    review UI (FastAPI + Jinja, no build step)
 src/dmocr/pipeline.py             ingest -> ocr -> classify -> extract -> assemble -> rules
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
@@ -72,6 +74,7 @@ docs/
   cross-document.md               entity resolution, and why false merging is the worse error
   verification.md                 tiers, data minimisation, and why unavailable is not failure
   evaluation.md                   why the metrics must not reward guessing
+  ui.md                           the box check, and where gating is right
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally
@@ -107,12 +110,22 @@ rule-ready and why.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[tools,dev,ocr]"
+.venv/Scripts/python.exe -m pip install -e ".[tools,dev,ocr,web]"
 ```
 
 ```bash
 python -m pytest tests -q
 ```
+
+## Review UI
+
+```bash
+python -m dmocr.web
+```
+
+Localhost only — there is no authentication (ADR-0002), so the network boundary is the
+control. Upload boxes per document type, a three-outcome type check, case-level findings,
+and click-a-field-to-see-the-region-on-the-page.
 
 ## Running the corpus survey
 
