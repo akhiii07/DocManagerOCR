@@ -78,6 +78,10 @@ class CaseResult:
     case: Case
     documents: list[DocumentOutcome] = field(default_factory=list)
     assembly: AssemblyResult | None = None
+    #: document_id -> ExtractionResult. Retained so evaluation can score fields by their
+    #: schema NAME (`cts_number`) rather than by canonical attribute
+    #: (`property.parcel_identifier`), which several fields share.
+    extractions: dict[str, ExtractionResult] = field(default_factory=dict)
     verification: VerificationRun | None = None
     findings: list[Finding] = field(default_factory=list)
     ingest_summary: dict = field(default_factory=dict)
@@ -146,6 +150,7 @@ class CasePipeline:
             result.documents.append(outcome)
 
         result.ingest_summary = summarise_ingest(ingest_results)
+        result.extractions = dict(extractions)
         result.assembly = self.assembler.assemble(case, extractions)
         result.notes.extend(result.assembly.notes)
 

@@ -1,0 +1,32 @@
+# Ground truth for the rendered-text OCR fixture.
+#
+# This one exercises CER/WER, because text_scan.pdf has NO text layer and must go through
+# the recogniser. The reference text is exactly what the generator drew, so this measures
+# the recogniser against a known-perfect target.
+#
+# Read the resulting CER as a FLOOR on error, not an estimate of it. Cleanly rendered
+# digital text at 200 dpi is the easiest possible input: no scanner noise, no skew, no
+# stamps, no handwriting, no Devanagari. Real Mumbai deeds will be worse.
+
+synthetic: true
+case_id: SYNTH_OCR
+notes: Single scanned page of rendered text, for CER/WER.
+
+documents:
+  - file: text_scan.pdf
+    document_type: sale_deed
+    reference_text: |
+      DEED OF SALE
+      This Deed of Sale is executed at Mumbai on the 14th day of
+      March 2024 BETWEEN Ramesh Patil, hereinafter called the
+      VENDOR, of the One Part AND Anita Desai, hereinafter
+      called the PURCHASER, of the Other Part.
+      Flat No. 402, C.T.S. No. 1234/5A, Andheri West, Mumbai.
+      Carpet Area: 1150 sq. ft.
+      Consideration: Rs. 1,25,00,000
+    fields:
+      consideration: "12500000"
+      execution_date: "2024-03-14"
+      cts_number: "1234/5A"
+      area: {value: 1150, unit: sq_ft, basis: carpet}
+      buyer: "Anita Desai"

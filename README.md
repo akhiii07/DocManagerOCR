@@ -24,8 +24,9 @@ platform for lending underwriting.
 | **P7** Cross-document validation | Done — `src/dmocr/resolve/` + `pipeline.py`. |
 | **P8** Verification orchestrator | Done — `src/dmocr/verify/`, planner + T4 task queue. |
 | **P9** Verification-aware rules | Done — external results become findings. |
-| Tests | 437 passing. |
-| Next | Risk Manager review UI, or evaluation harness |
+| **P10** Evaluation harness | Done — `src/dmocr/eval/`, metrics that don't reward guessing. |
+| Tests | 493 passing. |
+| Next | Risk Manager review UI |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -56,6 +57,7 @@ src/dmocr/classify/               which extraction schema applies
 src/dmocr/extract/                schemas, finders, span grounding -> claims
 src/dmocr/resolve/                entity resolution + case assembly
 src/dmocr/verify/                 source planning, adapters, operator tasks, comparison
+src/dmocr/eval/                   ground truth, metrics, regression gates
 src/dmocr/pipeline.py             ingest -> ocr -> classify -> extract -> assemble -> rules
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
@@ -69,6 +71,7 @@ docs/
   extraction.md                   grounding, Indian conventions, what real OCR taught us
   cross-document.md               entity resolution, and why false merging is the worse error
   verification.md                 tiers, data minimisation, and why unavailable is not failure
+  evaluation.md                   why the metrics must not reward guessing
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally
@@ -82,6 +85,7 @@ tools/
   corpus_survey.py                Phase 0 — measure the real document corpus
   make_fixtures.py                synthetic fixtures (tier-1 dev data)
   reg_text.py                     B1 — search primary instruments
+  evaluate.py                     run the evaluation harness
   check_regulatory.py             B1 — enforce knowledge-base invariants
   requirements.txt
 ```
@@ -139,9 +143,13 @@ Everything above is tested against **synthetic fixtures**. That is enough to pro
 plumbing — routing, coordinates, caching, provenance, rule gating — but it says nothing
 about accuracy on real Mumbai documents.
 
-There are no OCR, classification or extraction accuracy numbers, and there will not be
-until the real corpus is available. See items 8, 22, 23, 24 and 28 in
+The evaluation harness now exists and runs, but on **synthetic fixtures its results
+measure plumbing, not competence** — the values are the ones the generator wrote. Real
+accuracy numbers still require the real corpus. See items 8, 22, 23, 24 and 28 in
 [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
+
+The one genuinely informative measurement so far is OCR on a rendered page: **CER 4.2%,
+WER 29.8%** — characters read well, word boundaries do not.
 
 Running one real recogniser over one generated page already found four pattern bugs — OCR
 drops word boundaries, and every whitespace-dependent pattern failed on it. That is the

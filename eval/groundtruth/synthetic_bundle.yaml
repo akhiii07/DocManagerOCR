@@ -1,0 +1,60 @@
+# Ground truth for the synthetic bundle produced by tools/make_fixtures.py.
+#
+# Marked `synthetic` because it describes GENERATED documents and contains no customer
+# data, so it belongs in version control. Ground truth for real documents does NOT -
+# it is transcribed customer content and must live outside the repository.
+#
+# Its purpose is to prove the harness works and to catch regressions, NOT to measure
+# accuracy: the values here are the ones the generator wrote, so a system that reads them
+# correctly has demonstrated plumbing, not competence on real Mumbai deeds.
+
+synthetic: true
+case_id: SYNTH_BUNDLE
+notes: >-
+  Three documents describing one property. The tax bill deliberately states a different
+  area (980 vs 1150 sq ft) so cross-document validation has a real conflict to find.
+
+documents:
+  - file: bundle/bundle_sale_deed.pdf
+    document_type: sale_deed
+    fields:
+      consideration: "12500000"
+      execution_date: "2024-03-14"
+      cts_number: "1234/5A"
+      area: {value: 1150, unit: sq_ft, basis: carpet}
+      seller: "Ramesh Patil"
+      buyer: "Anita Desai"
+    absent_fields:
+      # No RERA number appears in this deed. Without this line an invented one would
+      # be invisible to the harness.
+      - maharera_number
+
+  - file: bundle/bundle_agreement.pdf
+    document_type: agreement_of_sale
+    fields:
+      consideration: "12500000"
+      agreement_date: "2024-01-02"
+      cts_number: "1234/5A"
+      area: {value: 1150, unit: sq_ft, basis: carpet}
+      seller: "R. Patil"
+      buyer: "Anita Dessai"
+      maharera_number: "P51900012345"
+
+  - file: bundle/bundle_property_tax.pdf
+    document_type: property_tax
+    fields:
+      assessment_number: "A-1234567890"
+      cts_number: "1234/5A"
+      area: {value: 980, unit: sq_ft, basis: carpet}
+
+expected_findings:
+  # The area conflict must be found.
+  - rule_id: XDOC_AREA_001
+    determination: MISMATCH
+  # All three documents agree on the parcel.
+  - rule_id: XDOC_PARCEL_001
+    determination: MATCH
+
+expected_clear:
+  # The security is unknown on this case, so the TPA s.59 check must NOT assert a defect.
+  - MORTGAGE_REG_001

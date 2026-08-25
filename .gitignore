@@ -63,3 +63,7 @@ fixtures/
 Thumbs.db
 desktop.ini
 
+
+# Evaluation output - may contain values when --show-names/--show-values is used
+eval-output/
+eval/groundtruth/real/

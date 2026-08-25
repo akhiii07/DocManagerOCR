@@ -58,6 +58,28 @@ def mixed_bundle_pdf(fixtures_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def eval_result(fixtures_dir: Path):
+    """One evaluation run, shared across the whole session.
+
+    Session-scoped because a run OCRs the scanned fixture, and re-running it per test
+    took the eval suite from seconds to nearly six minutes. A slow suite is a suite people
+    stop running.
+    """
+    from dmocr.eval import EvaluationRunner, load_corpus
+
+    return EvaluationRunner().run(load_corpus(Path("eval/groundtruth")), fixtures_dir)
+
+
+@pytest.fixture(scope="session")
+def eval_result_with_values(fixtures_dir: Path):
+    """Same run, with values retained - for asserting the opt-in behaves."""
+    from dmocr.eval import EvaluationRunner, load_corpus
+
+    return EvaluationRunner(include_values=True).run(
+        load_corpus(Path("eval/groundtruth")), fixtures_dir)
+
+
+@pytest.fixture(scope="session")
 def bundle_dir(fixtures_dir: Path) -> Path:
     """Three documents describing ONE property, with a deliberate area conflict.
 

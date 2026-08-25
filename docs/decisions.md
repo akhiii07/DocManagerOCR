@@ -386,6 +386,29 @@ explicit in YAML so the inversion is visible rather than buried in a predicate.
 
 ---
 
+## ADR-0018 — Evaluation metrics separate being wrong from declining to answer
+**Date:** 2026-08-25 · **Status:** Accepted
+
+**Decision.** Evaluation outcomes are six-valued (`CORRECT`, `NEAR`, `WRONG`, `MISSING`,
+`SPURIOUS`, `NOT_EVALUATED`), and `dangerous_error_rate` — the share that produced a wrong
+or invented value — is the headline safety metric. Classification reports deferral rate
+separately from misclassification rate.
+
+**Why.** A harness that scores every non-correct answer as an error ranks a guessing system
+above a cautious one. Every control this platform has against confident wrongness — the
+span-grounding verifier, `UNKNOWN` routing, `NOT_DETERMINABLE`, the review band in name
+matching — would then be a liability in its own evaluation, and the obvious way to improve
+the score would be to guess more.
+
+`WRONG` and `SPURIOUS` reach a Risk Manager as an answer. `MISSING` surfaces as a gap.
+Reporting them in one number hides the distinction that matters most.
+
+**Consequences.** No single headline accuracy figure. Ground truth must carry
+`absent_fields` and `expected_clear`, or invented values and false positives are invisible.
+An unmeasured regression gate skips rather than fails, since "not measured" is not "failed".
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |
