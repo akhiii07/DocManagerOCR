@@ -287,6 +287,42 @@ class TestVerificationIntegration:
         assert "EXTERNAL VERIFICATION" in text
         assert "OPERATOR TASKS" in text
 
+    def test_a_prior_charge_becomes_a_blocker_end_to_end(self, bundle_dir: Path):
+        """The closed loop: registry -> adapter -> comparison -> rule -> finding."""
+        from dmocr.model import TextValue
+        from dmocr.verify import AccessTier, StaticAdapter
+
+        adapter = StaticAdapter(
+            "SRC_CERSAI", "CERSAI", AccessTier.T2_LICENSED,
+            {"property.encumbrance": TextValue(
+                raw="Mortgage in favour of XYZ Bank, filed 2023-06-11")},
+        )
+        result = self._pipeline_with_verifier([adapter]).process_directory(
+            make_case(), bundle_dir)
+        charge = next(f for f in result.findings
+                      if f.rule_id == "EXT_CERSAI_CHARGE_001")
+        assert charge.determination is Determination.MISMATCH
+        assert charge.disposition is Disposition.BLOCKER
+        assert "XYZ Bank" in charge.message
+        assert charge.is_regulatory
+
+    def test_a_clean_register_clears_end_to_end(self, bundle_dir: Path):
+        from dmocr.verify import AccessTier, StaticAdapter
+
+        adapter = StaticAdapter("SRC_CERSAI", "CERSAI", AccessTier.T2_LICENSED,
+                                {}, record_found=False)
+        result = self._pipeline_with_verifier([adapter]).process_directory(
+            make_case(), bundle_dir)
+        charge = next(f for f in result.findings
+                      if f.rule_id == "EXT_CERSAI_CHARGE_001")
+        assert charge.disposition is Disposition.CLEARED
+
+    def test_verification_results_are_recorded_on_the_case(self, bundle_dir: Path):
+        case = make_case()
+        self._pipeline_with_verifier().process_directory(case, bundle_dir)
+        assert case.verification_results
+        assert case.verification_for(source_id="SRC_PROPERTY_CARD_MH")
+
     def test_without_a_verifier_the_absence_is_stated(self, bundle_dir: Path):
         result = make_pipeline().process_directory(make_case(), bundle_dir)
         assert result.verification is None

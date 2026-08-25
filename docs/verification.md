@@ -111,14 +111,46 @@ External data is snapshotted and **never re-fetched during a re-run**. Without t
 cannot be reproduced, because the outside world will have moved — and a finding that cannot
 be reproduced cannot be defended.
 
+## Results become findings
+
+Verification results are written onto the `Case`, and rules read them through the same
+engine as everything else — no parallel reporting path. Two predicate shapes, because
+comparison and presence are different questions (ADR-0017):
+
+| Predicate | Question | Used by |
+|---|---|---|
+| `external_agreement` | Does the authority agree with the documents? | owner, area |
+| `external_record_presence` | Does the register hold a record at all? | prior charge |
+| `verification_coverage` | How much of the plan actually happened? | completeness |
+
+**`EXT_CERSAI_CHARGE_001` is the one rule where absence is the good answer.** A record
+existing means a prior charge over the collateral, which under SARFAESI s.26C takes
+priority over our security. The reading is a parameter (`presence_means: adverse`) rather
+than an assumption, so the inversion is visible in the rule file.
+
+```
+no adapter registered  ->  NOT_DETERMINABLE   REVIEW_REQUIRED
+no charge on register  ->  MATCH              CLEARED
+prior charge exists    ->  MISMATCH           BLOCKER  (CRITICAL)
+```
+
+### The bug that shape prevented
+
+A CERSAI hit arrives as `NOT_APPLICABLE`, because there is nothing in the borrower's own
+documents to compare a charge against. The first implementation filtered those out as
+"not a real answer" — so **a genuine prior charge reported `NOT_DETERMINABLE` and was
+effectively invisible.**
+
+Fixed by making `counts_as_a_check` mean *"the authority answered"*: `NOT_APPLICABLE` with
+an external value counts, because the register holding a record **is** the signal. Two
+regression tests name this.
+
 ## Not yet built
 
 - **A real CERSAI adapter.** It is the one plausible automated source and has the
   strongest legal footing (SARFAESI s.26: inspection open to any person, expressly
   including electronically). Blocked on whether the lender holds an entity account
-  (OPEN-ITEMS 7) and on ADR-0006.
-- **Verification-driven rules.** Results are produced but no rule consumes them yet; a
-  CERSAI charge hit should be a `CRITICAL` finding per `REQ_SARFAESI_26C`.
+  (OPEN-ITEMS 7) and on ADR-0006. Everything downstream of it is built and tested.
 - **Artefact storage** for operator captures — currently a reference only.
 - **Retry and rate-limit policy** per source.
 - Freshness windows are placeholders, not researched.

@@ -386,6 +386,204 @@ class TestCrossDocument:
 # =====================================================================================
 
 
+class TestVerificationAwareRules:
+    """Rules that consume external verification results.
+
+    The highest-stakes predicate in the system: a prior registered charge threatens the
+    recoverability of the security, and an unreachable registry must never look like one.
+    """
+
+    def _case_with(self, *results, **kw) -> Case:
+        from dmocr.model import Property
+
+        case = make_case(**kw)
+        case.properties.append(Property())
+        case.verification_results = list(results)
+        return case
+
+    def _result(self, **kw):
+        from dmocr.model.verification import AccessTier, VerificationResult
+
+        kw.setdefault("source_id", "SRC_CERSAI")
+        kw.setdefault("authority", "CERSAI")
+        kw.setdefault("attribute", "property.encumbrance")
+        kw.setdefault("tier", AccessTier.T2_LICENSED)
+        return VerificationResult(**kw)
+
+    def _finding(self, case: Case, rule_id: str):
+        rs = RuleSet.from_yaml(RULES_PATH)
+        return next(f for f in RuleEngine(rs).evaluate(case, mode=ExecutionMode.DRY_RUN)
+                    if f.rule_id == rule_id)
+
+    # -- prior charge ------------------------------------------------------------
+
+    def test_prior_charge_blocks(self):
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            status=VerificationStatus.NOT_APPLICABLE,
+            external_value="Mortgage in favour of XYZ Bank",
+            snapshot_id="SNAP_1",
+        ))
+        f = self._finding(case, "EXT_CERSAI_CHARGE_001")
+        assert f.determination is Determination.MISMATCH
+        assert f.disposition is Disposition.BLOCKER
+        assert f.severity is Severity.CRITICAL
+        assert "XYZ Bank" in f.message
+
+    def test_charge_recorded_as_not_applicable_is_still_present(self):
+        """Regression. A CERSAI hit arrives as NOT_APPLICABLE because there is nothing in
+        the borrower's own documents to compare it against. Filtering that out made a real
+        prior charge report NOT_DETERMINABLE - i.e. invisible."""
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            status=VerificationStatus.NOT_APPLICABLE,
+            external_value="Charge filed 2023-06-11",
+        ))
+        assert self._finding(
+            case, "EXT_CERSAI_CHARGE_001").determination is Determination.MISMATCH
+
+    def test_no_charge_on_the_register_clears(self):
+        """Absence is the GOOD answer here - the one place in the rule set where it is."""
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            status=VerificationStatus.NOT_FOUND_IN_SOURCE))
+        f = self._finding(case, "EXT_CERSAI_CHARGE_001")
+        assert f.determination is Determination.MATCH
+        assert f.disposition is Disposition.CLEARED
+
+    def test_unreachable_registry_never_blocks(self):
+        """CRITICAL severity, but nothing was established."""
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            status=VerificationStatus.SOURCE_UNAVAILABLE))
+        f = self._finding(case, "EXT_CERSAI_CHARGE_001")
+        assert f.determination is Determination.NOT_DETERMINABLE
+        assert f.disposition is not Disposition.BLOCKER
+        assert "not a failure" in f.message
+
+    def test_pending_operator_task_never_blocks(self):
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            status=VerificationStatus.PENDING_MANUAL))
+        f = self._finding(case, "EXT_CERSAI_CHARGE_001")
+        assert f.determination is Determination.NOT_DETERMINABLE
+        assert f.disposition is not Disposition.BLOCKER
+
+    def test_no_verification_at_all_is_not_determinable(self):
+        f = self._finding(self._case_with(), "EXT_CERSAI_CHARGE_001")
+        assert f.determination is Determination.NOT_DETERMINABLE
+
+    def test_charge_rule_carries_its_regulatory_citations(self):
+        f = self._finding(self._case_with(), "EXT_CERSAI_CHARGE_001")
+        assert f.is_regulatory
+        assert "REQ_SARFAESI_26C_PUBLIC_NOTICE_AND_PRIORITY" in f.citations
+
+    # -- agreement ---------------------------------------------------------------
+
+    def test_owner_mismatch_against_the_land_record(self):
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(self._result(
+            source_id="SRC_PROPERTY_CARD_MH", authority="City Survey Office",
+            attribute="party.owner", tier=AccessTier.T5_OFFLINE,
+            status=VerificationStatus.MISMATCH,
+            internal_value="Ramesh Patil", external_value="Suresh Kulkarni",
+        ))
+        f = self._finding(case, "EXT_OWNER_MATCH_001")
+        assert f.determination is Determination.MISMATCH
+        assert "Suresh Kulkarni" in f.message
+
+    def test_owner_agreement_clears(self):
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(self._result(
+            source_id="SRC_PROPERTY_CARD_MH", authority="City Survey Office",
+            attribute="party.owner", tier=AccessTier.T5_OFFLINE,
+            status=VerificationStatus.MATCH,
+            internal_value="Ramesh Patil", external_value="R. Patil",
+        ))
+        assert self._finding(
+            case, "EXT_OWNER_MATCH_001").disposition is Disposition.CLEARED
+
+    def test_the_worst_status_wins_across_sources(self):
+        """One contradiction must not be hidden by other sources agreeing."""
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(
+            self._result(source_id="SRC_A", attribute="party.owner",
+                         tier=AccessTier.T2_LICENSED,
+                         status=VerificationStatus.MATCH, external_value="X"),
+            self._result(source_id="SRC_B", attribute="party.owner",
+                         tier=AccessTier.T2_LICENSED,
+                         status=VerificationStatus.MISMATCH, external_value="Y"),
+        )
+        assert self._finding(
+            case, "EXT_OWNER_MATCH_001").determination is Determination.MISMATCH
+
+    def test_stale_record_is_not_agreement_nor_contradiction(self):
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(self._result(
+            attribute="party.owner", tier=AccessTier.T5_OFFLINE,
+            status=VerificationStatus.STALE, external_value="X"))
+        assert self._finding(
+            case, "EXT_OWNER_MATCH_001").determination is Determination.NOT_DETERMINABLE
+
+    def test_source_out_of_scope_is_not_applicable(self):
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            source_id="SRC_MAHARERA", authority="MahaRERA", attribute="*",
+            status=VerificationStatus.NOT_APPLICABLE,
+            detail="No MahaRERA registration number extracted.",
+        ))
+        # The wildcard result answers any attribute question about that source.
+        f = self._finding(case, "EXT_OWNER_MATCH_001")
+        assert f.determination in (Determination.NOT_APPLICABLE,
+                                   Determination.NOT_DETERMINABLE)
+
+    def test_insufficient_tier_cannot_support_a_conclusion(self):
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(self._result(
+            attribute="party.owner", tier=AccessTier.T6_UNAVAILABLE,
+            status=VerificationStatus.MISMATCH, external_value="X"))
+        assert self._finding(
+            case, "EXT_OWNER_MATCH_001").determination is Determination.NOT_DETERMINABLE
+
+    # -- coverage ----------------------------------------------------------------
+
+    def test_coverage_reports_partial_completion(self):
+        from dmocr.model.verification import AccessTier, VerificationStatus
+
+        case = self._case_with(
+            self._result(status=VerificationStatus.NOT_FOUND_IN_SOURCE),
+            self._result(source_id="SRC_MCGM_PTAX", attribute="tax.assessment_number",
+                         tier=AccessTier.T4_PORTAL_MANUAL,
+                         status=VerificationStatus.PENDING_MANUAL),
+        )
+        f = self._finding(case, "EXT_COVERAGE_001")
+        assert f.determination is Determination.PARTIAL_MATCH
+        assert "1 of 2" in f.message or "1 of 2" in f.evidence.note
+
+    def test_coverage_is_not_applicable_when_no_source_was_in_scope(self):
+        from dmocr.model.verification import VerificationStatus
+
+        case = self._case_with(self._result(
+            attribute="*", status=VerificationStatus.NOT_APPLICABLE))
+        assert self._finding(
+            case, "EXT_COVERAGE_001").disposition is Disposition.NOT_APPLICABLE
+
+    def test_coverage_without_any_verification(self):
+        assert self._finding(
+            self._case_with(), "EXT_COVERAGE_001").determination is Determination.NOT_DETERMINABLE
+
+
 class TestEngineRobustness:
     def test_a_crashed_check_is_reported_not_swallowed(self):
         from dmocr.rules.registry import predicate

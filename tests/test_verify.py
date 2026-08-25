@@ -171,6 +171,17 @@ class TestStatusSemantics:
         assert not r.counts_as_a_check
         assert not r.review_required
 
+    def test_not_applicable_without_a_value_is_not_an_answer(self):
+        """Out-of-scope is different from 'answered but nothing to compare'."""
+        from dmocr.model.verification import VerificationResult
+
+        r = VerificationResult(
+            source_id="S", authority="A", attribute="property.area",
+            tier=AccessTier.T4_PORTAL_MANUAL,
+            status=VerificationStatus.NOT_APPLICABLE,
+        )
+        assert not r.counts_as_a_check
+
 
 # =====================================================================================
 # Planning
@@ -324,7 +335,7 @@ class TestCompareObservation:
         assert r.status is VerificationStatus.NOT_FOUND_IN_SOURCE
         assert r.review_required
 
-    def test_nothing_internal_to_compare_is_not_a_check(self):
+    def test_nothing_internal_to_compare_yields_not_applicable(self):
         from dmocr.verify import compare_observation
         prop = Property()
         r = compare_observation("property.area", prop.resolve("property.area"),
@@ -332,6 +343,11 @@ class TestCompareObservation:
                                     area=Area.of(1000, AreaUnit.SQ_FT))}),
                                 tier=AccessTier.T4_PORTAL_MANUAL)
         assert r.status is VerificationStatus.NOT_APPLICABLE
+        # The external value is still recorded, and the authority DID answer. Treating
+        # this as "no answer" made a real CERSAI charge invisible - see
+        # test_charge_recorded_as_not_applicable_is_still_present.
+        assert r.external_value is not None
+        assert r.counts_as_a_check
 
     def test_stale_record_is_flagged(self):
         from dmocr.verify import compare_observation

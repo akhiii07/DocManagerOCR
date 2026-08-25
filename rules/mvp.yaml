@@ -170,6 +170,93 @@ rules:
       Reduce the sanctioned amount or obtain a higher supportable valuation. Note the
       numerator is total outstanding without netting, not sanctioned principal.
 
+  # ===================================================================================
+  # External verification - regulatory
+  # ===================================================================================
+
+  - rule_id: EXT_CERSAI_CHARGE_001
+    version: "1.0.0"
+    title: No prior registered charge over the collateral
+    category: external_verification
+    severity: CRITICAL
+    determinacy: EXTERNAL_VERIFIED
+    check: external_record_presence
+    params:
+      source_id: SRC_CERSAI
+      attribute: property.encumbrance
+      # A record EXISTING is the adverse outcome here. This is the one place in the rule
+      # set where absence is the good answer, which is why the predicate takes the
+      # reading as a parameter rather than assuming it.
+      presence_means: adverse
+    citations:
+      - REQ_SARFAESI_26C_PUBLIC_NOTICE_AND_PRIORITY
+      - REQ_SARFAESI_26E_PRIORITY_TO_SECURED_CREDITORS
+    status: DRAFT
+    message: >-
+      A charge is registered against this property with {authority}: {external}.
+      Registration constitutes public notice from the time of filing and takes priority
+      over any subsequent security interest.
+    recommended_action: >-
+      Obtain and review the registered charge. Under SARFAESI s.26C a prior registered
+      security interest ranks ahead of ours, so this is a direct threat to the
+      recoverability of the proposed security - not an informational note.
+
+  - rule_id: EXT_OWNER_MATCH_001
+    version: "1.0.0"
+    title: Owner matches the authoritative land record
+    category: external_verification
+    severity: HIGH
+    determinacy: EXTERNAL_VERIFIED
+    check: external_agreement
+    params:
+      attribute: party.owner
+    # Business rule: comparing the deed's owner against the Property Card is sound
+    # underwriting, but no instrument we have read mandates it. See the negative finding
+    # NEG_HFC_NO_TITLE_VERIFICATION_DUTY.
+    citations: []
+    status: DRAFT
+    message: >-
+      Owner named in the documents ({internal}) does not match {authority} ({external}).
+      {detail}
+    recommended_action: >-
+      Confirm the ownership record with the City Survey Office before proceeding. A
+      mismatch may indicate an unrecorded transfer, a pending mutation, or the wrong
+      parcel having been identified.
+
+  - rule_id: EXT_AREA_MATCH_001
+    version: "1.0.0"
+    title: Property area matches the authoritative record
+    category: external_verification
+    severity: MEDIUM
+    determinacy: EXTERNAL_VERIFIED
+    check: external_agreement
+    params:
+      attribute: property.area
+    citations: []
+    status: DRAFT
+    message: "Area {internal} does not match {authority} ({external}). {detail}"
+    recommended_action: >-
+      Reconcile against the Property Card before accepting the valuation. Check first
+      whether the two figures are stated on different bases (carpet vs built-up), which
+      is a common and legitimate difference rather than a discrepancy.
+
+  - rule_id: EXT_COVERAGE_001
+    version: "1.0.0"
+    title: External verification coverage
+    category: completeness
+    severity: MEDIUM
+    determinacy: DETERMINISTIC
+    check: verification_coverage
+    citations: []
+    status: DRAFT
+    message: >-
+      Only {answered} of {in_scope} in-scope external checks were answered
+      ({pending} awaiting an operator, {unavailable} unavailable).
+    recommended_action: >-
+      Complete the outstanding operator tasks before final decision. Unanswered checks
+      are open items for case completeness - they are NOT failures, and must not be read
+      as either passing or failing.
+
   - rule_id: LTV_CONSIDERATION_001
     version: "1.0.0"
     title: LTV property value not above documented transaction value

@@ -359,6 +359,33 @@ review package has to show open items rather than burying them in a pass rate.
 
 ---
 
+## ADR-0017 — Verification results live in the model; presence and comparison are separate predicates
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** `VerificationResult` and its supporting types moved to
+`dmocr/model/verification.py`, and `Case` holds `verification_results`. Rules read them
+through the normal engine. Two predicate shapes exist: `external_agreement` (comparison)
+and `external_record_presence` (presence), with the reading of absence as a parameter.
+
+**Why the move.** `Case` cannot hold verification results if the types live in the
+orchestration layer — orchestration depends on the model, never the reverse.
+`dmocr/verify/results.py` remains as a re-export so existing imports keep working.
+
+**Why two shapes.** "Does the owner match the land record?" and "Is there a prior charge?"
+are different questions. A charge check has nothing internal to compare against, so
+forcing it through a comparison predicate expresses it backwards.
+
+**The bug this prevented, found during implementation.** A CERSAI hit arrives as
+`NOT_APPLICABLE` (nothing internal to compare). The first version filtered those out as
+"not a real answer", so **a genuine prior charge reported `NOT_DETERMINABLE` — invisible.**
+Fixed by defining `counts_as_a_check` as "the authority answered": `NOT_APPLICABLE` **with
+an external value** counts, because the register holding a record is itself the signal.
+
+**Consequences.** Rule authors must choose the right predicate shape. `presence_means` is
+explicit in YAML so the inversion is visible rather than buried in a predicate.
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |

@@ -27,6 +27,7 @@ from .common import (
 )
 from .entities import Party, Project, Property
 from .provenance import ProcessingContext
+from .verification import VerificationResult
 
 
 def _new_id(prefix: str) -> str:
@@ -195,6 +196,11 @@ class Case(BaseModel):
     #: NOT_APPLICABLE for absent documents.
     expected_documents: list[DocumentType] = Field(default_factory=list)
 
+    #: What authoritative sources said. Written by the verification orchestrator and read
+    #: by verification-aware rules, so external results become findings through the same
+    #: engine as everything else rather than a parallel reporting path.
+    verification_results: list[VerificationResult] = Field(default_factory=list)
+
     processing_context: ProcessingContext | None = None
     opened_at: datetime = Field(default_factory=lambda: datetime.now())
 
@@ -230,6 +236,29 @@ class Case(BaseModel):
         if self.security_type is SecurityType.UNKNOWN:
             return None
         return self.security_type.requires_registered_instrument
+
+    # -- external verification ---------------------------------------------------
+
+    def verification_for(
+        self, *, source_id: str | None = None, attribute: str | None = None
+    ) -> list[VerificationResult]:
+        """Verification results filtered by source and/or attribute.
+
+        A result recorded against the wildcard attribute `"*"` describes the source as a
+        whole - typically why it did not apply - and is returned for any attribute query,
+        because "this source was out of scope" answers a question about every attribute
+        it would have covered.
+        """
+        out = self.verification_results
+        if source_id is not None:
+            out = [r for r in out if r.source_id == source_id]
+        if attribute is not None:
+            out = [r for r in out if r.attribute in (attribute, "*")]
+        return list(out)
+
+    def verification_answered(self, **kw) -> list[VerificationResult]:
+        """Only results where a source actually told us something."""
+        return [r for r in self.verification_for(**kw) if r.counts_as_a_check]
 
     # -- custody -----------------------------------------------------------------
 

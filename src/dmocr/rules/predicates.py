@@ -15,8 +15,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from ..model.common import Determination, DocumentType, SecurityType
+from ..model.common import ConfidenceTier, Determination, DocumentType, SecurityType
 from ..model.findings import Evidence
+from ..model.verification import VerificationResult, VerificationStatus
 from .registry import PredicateOutcome, predicate
 
 if TYPE_CHECKING:
@@ -237,6 +238,240 @@ def originals_held(case: "Case", params: dict) -> PredicateOutcome:
         ),
         message_vars={"detail": ""},
     )
+
+
+# =====================================================================================
+# External verification
+#
+# Two shapes, because "does the owner match the land record?" and "does a prior charge
+# exist?" are different questions. Collapsing them into one predicate would force one of
+# them to be expressed backwards.
+# =====================================================================================
+
+#: Worst-first, so a single contradiction is not hidden by other results agreeing.
+_STATUS_RANK: dict[VerificationStatus, int] = {
+    VerificationStatus.MISMATCH: 0,
+    VerificationStatus.NOT_FOUND_IN_SOURCE: 1,
+    VerificationStatus.PARTIAL_MATCH: 2,
+    VerificationStatus.STALE: 3,
+    VerificationStatus.MATCH: 4,
+    VerificationStatus.NOT_APPLICABLE: 5,
+    VerificationStatus.SOURCE_UNAVAILABLE: 6,
+    VerificationStatus.PENDING_MANUAL: 7,
+}
+
+
+def _evidence_from(results: list[VerificationResult]) -> Evidence:
+    return Evidence(
+        claim_ids=[cid for r in results for cid in r.internal_claim_ids],
+        external_snapshot_ids=[r.snapshot_id for r in results if r.snapshot_id],
+        note="; ".join(f"{r.source_id}/{r.attribute}: {r.status.value}" for r in results),
+    )
+
+
+def _unusable(results: list[VerificationResult], what: str) -> PredicateOutcome | None:
+    """Return NOT_DETERMINABLE when nothing usable came back.
+
+    Deliberately covers unavailable sources, pending operator tasks and any result whose
+    access tier cannot support a conclusion. None of these is a failure - the check simply
+    did not happen, and saying otherwise would let an unreachable portal look like an
+    adverse finding.
+    """
+    if not results:
+        return PredicateOutcome.not_determinable(
+            f"No external verification was attempted for {what}."
+        )
+
+    scoped_out = [r for r in results
+                  if r.attribute == "*" and r.status is VerificationStatus.NOT_APPLICABLE]
+    if scoped_out and not any(r.counts_as_a_check for r in results):
+        return PredicateOutcome(
+            determination=Determination.NOT_APPLICABLE,
+            evidence=_evidence_from(results),
+            message_vars={"reason": scoped_out[0].detail},
+        )
+
+    answered = [r for r in results if r.counts_as_a_check]
+    if not answered:
+        pending = sum(1 for r in results
+                      if r.status is VerificationStatus.PENDING_MANUAL)
+        unavailable = sum(1 for r in results
+                          if r.status is VerificationStatus.SOURCE_UNAVAILABLE)
+        return PredicateOutcome.not_determinable(
+            f"No authority answered for {what} "
+            f"({pending} pending operator task(s), {unavailable} unavailable). "
+            f"This is an open item for case completeness, not a failure."
+        )
+
+    if all(r.tier.confidence_ceiling is ConfidenceTier.INSUFFICIENT for r in answered):
+        return PredicateOutcome.not_determinable(
+            f"Every answer for {what} came from a source whose access tier cannot "
+            f"support a conclusion."
+        )
+    return None
+
+
+@predicate("external_agreement")
+def external_agreement(case: "Case", params: dict) -> PredicateOutcome:
+    """An authoritative source agrees with what the documents say.
+
+    Used for owner, area and parcel checks against a land record or registration entry.
+    """
+    attribute: str = params["attribute"]
+    source_id: str | None = params.get("source_id")
+    what = f"{attribute}" + (f" via {source_id}" if source_id else "")
+
+    results = case.verification_for(source_id=source_id, attribute=attribute)
+    early = _unusable(results, what)
+    if early is not None:
+        return early
+
+    answered = sorted(
+        (r for r in results if r.counts_as_a_check),
+        key=lambda r: _STATUS_RANK[r.status],
+    )
+    worst = answered[0]
+    evidence = _evidence_from(answered)
+    vars_ = {
+        "attribute": attribute,
+        "source": worst.source_id,
+        "authority": worst.authority,
+        "internal": worst.internal_value or "(none)",
+        "external": worst.external_value or "(none)",
+        "detail": worst.detail,
+    }
+
+    mapping = {
+        VerificationStatus.MATCH: Determination.MATCH,
+        VerificationStatus.PARTIAL_MATCH: Determination.PARTIAL_MATCH,
+        VerificationStatus.MISMATCH: Determination.MISMATCH,
+        VerificationStatus.NOT_FOUND_IN_SOURCE: Determination.MISSING,
+        # A stale record is not evidence of agreement, but it is not a contradiction
+        # either - the underlying record may simply not have been updated.
+        VerificationStatus.STALE: Determination.NOT_DETERMINABLE,
+    }
+    return PredicateOutcome(
+        determination=mapping.get(worst.status, Determination.NOT_DETERMINABLE),
+        evidence=evidence,
+        message_vars=vars_,
+    )
+
+
+@predicate("external_record_presence")
+def external_record_presence(case: "Case", params: dict) -> PredicateOutcome:
+    """Whether an authoritative register holds a record at all.
+
+    This is a PRESENCE question, not a comparison. For CERSAI the meaningful answer is
+    "is there a subsisting charge?", and there is normally nothing in the borrower's own
+    documents to compare against - so a comparison predicate would report NOT_APPLICABLE
+    and lose the very signal we came for.
+
+    `presence_means` inverts the reading:
+      * `adverse`   - a record existing is bad (a prior charge on the collateral)
+      * `expected`  - a record is expected to exist (the property should be on the register)
+    """
+    attribute: str = params["attribute"]
+    source_id: str | None = params.get("source_id")
+    presence_means: str = params.get("presence_means", "adverse")
+    what = f"{attribute}" + (f" via {source_id}" if source_id else "")
+
+    results = case.verification_for(source_id=source_id, attribute=attribute)
+    if not results:
+        return PredicateOutcome.not_determinable(
+            f"No external verification was attempted for {what}."
+        )
+
+    # Presence is judged directly from the results, NOT through the generic "was this a
+    # usable check" gate. A record-bearing result may carry any comparison status,
+    # including NOT_APPLICABLE where we had nothing internal to compare against - and for
+    # a prior-charge check that IS the answer.
+    with_record = [r for r in results if r.external_value]
+    not_found = [r for r in results
+                 if r.status is VerificationStatus.NOT_FOUND_IN_SOURCE]
+
+    present = bool(with_record)
+    if not present and not not_found:
+        scoped_out = [r for r in results if r.attribute == "*"
+                      and r.status is VerificationStatus.NOT_APPLICABLE]
+        if scoped_out:
+            return PredicateOutcome.not_applicable(scoped_out[0].detail)
+        pending = sum(1 for r in results
+                      if r.status is VerificationStatus.PENDING_MANUAL)
+        unavailable = sum(1 for r in results
+                          if r.status is VerificationStatus.SOURCE_UNAVAILABLE)
+        return PredicateOutcome.not_determinable(
+            f"No authority reported presence or absence for {what} "
+            f"({pending} pending operator task(s), {unavailable} unavailable). "
+            f"This is an open item for case completeness, not a failure."
+        )
+
+    relevant = with_record or not_found
+    evidence = _evidence_from(relevant)
+    vars_ = {
+        "attribute": attribute,
+        "source": relevant[0].source_id,
+        "authority": relevant[0].authority,
+        "external": relevant[0].external_value or "(no record)",
+        "detail": relevant[0].detail,
+    }
+
+    if presence_means == "expected":
+        determination = Determination.MATCH if present else Determination.MISSING
+    else:
+        determination = Determination.MISMATCH if present else Determination.MATCH
+    return PredicateOutcome(determination=determination, evidence=evidence,
+                            message_vars=vars_)
+
+
+@predicate("verification_coverage")
+def verification_coverage(case: "Case", params: dict) -> PredicateOutcome:
+    """How much of the planned external verification actually happened.
+
+    Reports case COMPLETENESS, which is deliberately separate from pass/fail. An
+    unreachable portal or an outstanding operator task is an open item, and burying either
+    in a pass rate would overstate how much the system has established.
+    """
+    results = case.verification_results
+    if not results:
+        return PredicateOutcome.not_determinable(
+            "No external verification was attempted for this case."
+        )
+
+    answered = [r for r in results if r.counts_as_a_check]
+    pending = [r for r in results if r.status is VerificationStatus.PENDING_MANUAL]
+    unavailable = [r for r in results
+                   if r.status is VerificationStatus.SOURCE_UNAVAILABLE]
+    in_scope = [r for r in results if r.status is not VerificationStatus.NOT_APPLICABLE]
+
+    vars_ = {
+        "answered": len(answered),
+        "in_scope": len(in_scope),
+        "pending": len(pending),
+        "unavailable": len(unavailable),
+    }
+    note = (
+        f"{len(answered)} of {len(in_scope)} in-scope external checks answered; "
+        f"{len(pending)} awaiting an operator, {len(unavailable)} unavailable."
+    )
+
+    if not in_scope:
+        return PredicateOutcome(
+            determination=Determination.NOT_APPLICABLE,
+            evidence=Evidence(note="No external source was in scope for this case."),
+            message_vars=vars_,
+        )
+    if not answered:
+        return PredicateOutcome(
+            determination=Determination.NOT_DETERMINABLE,
+            evidence=Evidence(note=note),
+            message_vars={**vars_, "reason": note},
+        )
+    determination = (
+        Determination.MATCH if len(answered) == len(in_scope)
+        else Determination.PARTIAL_MATCH
+    )
+    return PredicateOutcome(determination=determination,
+                            evidence=Evidence(note=note), message_vars=vars_)
 
 
 # =====================================================================================

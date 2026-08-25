@@ -16,15 +16,16 @@ platform for lending underwriting.
 | **B0** Authority map | Done — 8 authorities, 12 instruments mapped. |
 | **B1** Requirement extraction | 21 requirements, 18 rule-ready, 3 blocked. |
 | **P5** Canonical data model | Done — `src/dmocr/model/`. |
-| **P6** Rule engine + findings | Done — `src/dmocr/rules/`, 8 rules, all `DRAFT`. |
+| **P6** Rule engine + findings | Done — `src/dmocr/rules/`, 12 rules, all `DRAFT`. |
 | **P1** Ingestion + quality gate | Done — `src/dmocr/ingest/`. |
 | **P2** OCR + text layer | Done — `src/dmocr/ocr/`, per-page routing, RapidOCR. |
 | **P3** Classification | Done — `src/dmocr/classify/`, rule-based baseline. |
 | **P4** Structured extraction | Done — `src/dmocr/extract/`, deterministic + grounding. |
 | **P7** Cross-document validation | Done — `src/dmocr/resolve/` + `pipeline.py`. |
 | **P8** Verification orchestrator | Done — `src/dmocr/verify/`, planner + T4 task queue. |
-| Tests | 417 passing. |
-| Next | A real CERSAI adapter, and rules that consume verification results |
+| **P9** Verification-aware rules | Done — external results become findings. |
+| Tests | 437 passing. |
+| Next | Risk Manager review UI, or evaluation harness |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 

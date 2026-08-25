@@ -119,6 +119,10 @@ class VerificationOrchestrator:
                     f"so it was not used. Querying on a disputed identifier would "
                     f"retrieve the wrong record."
                 )
+
+        # Record on the case so verification-aware rules can read them through the same
+        # engine as everything else, rather than through a parallel reporting path.
+        case.verification_results = list(run.results)
         return run
 
     # -- outcomes ----------------------------------------------------------------
