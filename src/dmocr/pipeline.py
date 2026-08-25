@@ -41,6 +41,7 @@ from .ocr import (
 )
 from .resolve import AssemblyResult, CaseAssembler
 from .rules import ExecutionMode, RuleEngine, RuleSet, summarise
+from .verify import VerificationOrchestrator, VerificationRun, render_verification
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ class CaseResult:
     case: Case
     documents: list[DocumentOutcome] = field(default_factory=list)
     assembly: AssemblyResult | None = None
+    verification: VerificationRun | None = None
     findings: list[Finding] = field(default_factory=list)
     ingest_summary: dict = field(default_factory=dict)
     finding_summary: dict = field(default_factory=dict)
@@ -98,6 +100,7 @@ class CasePipeline:
         classifier_config: ClassifierConfig | None = None,
         rule_set: RuleSet | None = None,
         rule_mode: ExecutionMode = ExecutionMode.ENFORCE,
+        verifier: VerificationOrchestrator | None = None,
     ):
         self.ingestion = IngestionService(store, quality_thresholds)
         self.text = TextExtractionService(
@@ -109,6 +112,9 @@ class CasePipeline:
         self.assembler = CaseAssembler()
         self.rule_set = rule_set
         self.rule_mode = rule_mode
+        #: Optional. External verification runs AFTER assembly, because it needs resolved
+        #: canonical values to know what to look up and what to compare against.
+        self.verifier = verifier
 
     # -- public API --------------------------------------------------------------
 
@@ -142,6 +148,14 @@ class CasePipeline:
         result.ingest_summary = summarise_ingest(ingest_results)
         result.assembly = self.assembler.assemble(case, extractions)
         result.notes.extend(result.assembly.notes)
+
+        if self.verifier is not None:
+            result.verification = self.verifier.run(case)
+            result.notes.extend(result.verification.notes)
+        else:
+            result.notes.append(
+                "External verification not configured; no authority was consulted."
+            )
 
         if self.rule_set is not None:
             engine = RuleEngine(self.rule_set)
@@ -276,6 +290,10 @@ def render_summary(result: CaseResult) -> str:
             add(f"    {decision}")
         if a.needs_identity_review:
             add("    ** Identity uncertain on at least one party - review required.")
+        add("")
+
+    if result.verification is not None:
+        add(render_verification(result.verification))
         add("")
 
     if result.findings:

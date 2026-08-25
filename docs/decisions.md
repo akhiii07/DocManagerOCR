@@ -325,6 +325,40 @@ of transferring title names an owner" on a case containing a Sale Deed.
 
 ---
 
+## ADR-0015 — Verification source registry is loaded from the B0 research, not coded
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** `dmocr.verify.sources` reads `docs/regulatory/sources.yaml` — the file the
+B0 authority-map research produced — for tiers, verified attributes and lookup keys. A tier
+recorded as a range (`T1_OR_T2`) resolves to the **worse** tier.
+
+**Why.** Duplicating the registry in code would let a source's tier drift from the research
+that established it, and the research is the thing a reviewer would be shown if asked why
+a source was trusted. Resolving ranges pessimistically avoids promising automation the
+environment cannot deliver — B0 recorded these tiers as preliminary with low confidence.
+
+**Consequences.** Adding a source is a research-file edit. The code must tolerate research
+vocabulary it does not recognise, so `_VERIFIES_TO_ATTRIBUTE` is an explicit map and
+unmapped terms are skipped rather than guessed.
+
+---
+
+## ADR-0016 — SOURCE_UNAVAILABLE is never a compliance failure
+**Date:** 2026-08-24 · **Status:** Accepted
+
+**Decision.** Only `MISMATCH` and `NOT_FOUND_IN_SOURCE` are adverse verification outcomes.
+`SOURCE_UNAVAILABLE`, `PENDING_MANUAL`, `NOT_APPLICABLE` and `STALE` are not, and
+`checks_performed` counts only results where a source actually answered.
+
+**Why.** A portal being down says nothing about the collateral. Conflating "we could not
+check" with "the check failed" would make the system untrustworthy in the first direction
+reviewers notice, and it is the single easiest mistake to make in this layer.
+
+**Consequences.** Case *completeness* must be reported separately from pass/fail, and the
+review package has to show open items rather than burying them in a pass rate.
+
+---
+
 ## Open decisions
 
 | ID | Decision | Blocks | Notes |

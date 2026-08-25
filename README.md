@@ -22,8 +22,9 @@ platform for lending underwriting.
 | **P3** Classification | Done — `src/dmocr/classify/`, rule-based baseline. |
 | **P4** Structured extraction | Done — `src/dmocr/extract/`, deterministic + grounding. |
 | **P7** Cross-document validation | Done — `src/dmocr/resolve/` + `pipeline.py`. |
-| Tests | 357 passing. |
-| Next | External verification adapters (CERSAI first) |
+| **P8** Verification orchestrator | Done — `src/dmocr/verify/`, planner + T4 task queue. |
+| Tests | 417 passing. |
+| Next | A real CERSAI adapter, and rules that consume verification results |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -53,6 +54,7 @@ src/dmocr/ocr/                    text layer + OCR, routed per page
 src/dmocr/classify/               which extraction schema applies
 src/dmocr/extract/                schemas, finders, span grounding -> claims
 src/dmocr/resolve/                entity resolution + case assembly
+src/dmocr/verify/                 source planning, adapters, operator tasks, comparison
 src/dmocr/pipeline.py             ingest -> ocr -> classify -> extract -> assemble -> rules
 rules/mvp.yaml                    the rule set — all DRAFT until legal sign-off
 tests/
@@ -65,6 +67,7 @@ docs/
   classification.md               the cross-reference problem, and why UNKNOWN is a feature
   extraction.md                   grounding, Indian conventions, what real OCR taught us
   cross-document.md               entity resolution, and why false merging is the worse error
+  verification.md                 tiers, data minimisation, and why unavailable is not failure
   OPEN-ITEMS.md                   everything deferred, in one place
   privacy/
     data-handling-policy.md       the hard constraint, stated operationally

@@ -237,6 +237,62 @@ class TestDegradation:
 # =====================================================================================
 
 
+class TestVerificationIntegration:
+    def _pipeline_with_verifier(self, adapters=None):
+        from dmocr.verify import AdapterRegistry, VerificationOrchestrator
+
+        return CasePipeline(
+            InMemoryContentStore(),
+            ocr_engine=UnavailableEngine("text layer only"),
+            rule_set=RuleSet.from_yaml(RULES),
+            rule_mode=ExecutionMode.DRY_RUN,
+            verifier=VerificationOrchestrator(AdapterRegistry(adapters or [])),
+        )
+
+    def test_verification_runs_after_assembly(self, bundle_dir: Path):
+        """It needs resolved canonical values to know what to look up."""
+        result = self._pipeline_with_verifier().process_directory(make_case(), bundle_dir)
+        assert result.verification is not None
+        assert result.verification.plan.items
+
+    def test_extracted_identifiers_become_lookup_keys(self, bundle_dir: Path):
+        result = self._pipeline_with_verifier().process_directory(make_case(), bundle_dir)
+        card = next(i for i in result.verification.plan.items
+                    if i.source_id == "SRC_PROPERTY_CARD_MH")
+        assert card.lookup_keys == {"cts_number": "1234/5A"}
+
+    def test_maharera_is_in_scope_because_the_agreement_carries_a_number(self, bundle_dir):
+        from dmocr.verify import Execution
+
+        result = self._pipeline_with_verifier().process_directory(make_case(), bundle_dir)
+        rera = next(i for i in result.verification.plan.items
+                    if i.source_id == "SRC_MAHARERA")
+        assert rera.execution is not Execution.SKIP
+
+    def test_an_automated_source_produces_a_real_check(self, bundle_dir: Path):
+        from dmocr.model import TextValue
+        from dmocr.verify import AccessTier, StaticAdapter, VerificationStatus
+
+        adapter = StaticAdapter("SRC_CERSAI", "CERSAI", AccessTier.T2_LICENSED,
+                                {"property.encumbrance": TextValue(raw="No charge")})
+        result = self._pipeline_with_verifier([adapter]).process_directory(
+            make_case(), bundle_dir)
+        cersai = [r for r in result.verification.results if r.source_id == "SRC_CERSAI"]
+        assert cersai
+        assert all(r.status is not VerificationStatus.SOURCE_UNAVAILABLE for r in cersai)
+
+    def test_verification_appears_in_the_review_package(self, bundle_dir: Path):
+        text = render_summary(
+            self._pipeline_with_verifier().process_directory(make_case(), bundle_dir))
+        assert "EXTERNAL VERIFICATION" in text
+        assert "OPERATOR TASKS" in text
+
+    def test_without_a_verifier_the_absence_is_stated(self, bundle_dir: Path):
+        result = make_pipeline().process_directory(make_case(), bundle_dir)
+        assert result.verification is None
+        assert any("no authority was consulted" in n for n in result.notes)
+
+
 class TestSummary:
     def test_summary_leads_with_what_needs_attention(self, bundle_dir: Path):
         case = make_case(expected_documents=[
