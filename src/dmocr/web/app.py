@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..model.findings import Disposition
+from .auth import AccessControl, AccessMiddleware, check_binding
 from .render import crop_evidence
 from .service import BOXES, OTHER_BOX, ReviewSession, box_label
 
@@ -39,6 +40,14 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 
 session = ReviewSession()
 
+#: Set by serve(). Empty in localhost mode, which is the default.
+access = AccessControl()
+app.add_middleware(AccessMiddleware, access=access)
+
+#: True when reachable beyond loopback. Drives the demo banner - a shared instance must
+#: say, on every page, that it is not for real customer documents.
+PUBLIC_MODE = False
+
 
 # =====================================================================================
 # Pages
@@ -50,7 +59,14 @@ def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "boxes": session.boxes(),
         "rules_version": session.rule_set.version if session.rule_set else None,
+        "public_mode": PUBLIC_MODE,
     })
+
+
+@app.get("/healthz")
+def healthz():
+    """Open by design, so a tunnel health check does not need the token."""
+    return {"ok": True}
 
 
 # =====================================================================================
@@ -190,22 +206,30 @@ def _finding_json(f) -> dict:
     }
 
 
-def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
-    """Run the UI. Refuses to bind anywhere but loopback."""
-    import ipaddress
+def configure_access(token: str | None) -> None:
+    """Install the shared token and switch on public mode."""
+    global PUBLIC_MODE
 
+    access.token = token or None
+    PUBLIC_MODE = access.enabled
+
+
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    *,
+    token: str | None = None,
+) -> None:
+    """Run the UI.
+
+    Binds to loopback freely. Binds anywhere else ONLY with a token - the conditional
+    form of the ADR-0002 control: localhost, or authenticated, never neither.
+    """
     import uvicorn
 
-    try:
-        if not ipaddress.ip_address(host).is_loopback:
-            raise ValueError
-    except ValueError:
-        raise SystemExit(
-            f"refusing to bind to {host!r}. There is no authentication (ADR-0002), so "
-            f"this service must not be reachable from an untrusted network. Use "
-            f"127.0.0.1 and tunnel if you need remote access."
-        ) from None
+    configure_access(token)
+    check_binding(host, access)
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
-__all__ = ["app", "serve", "box_label"]
+__all__ = ["app", "serve", "configure_access", "box_label"]

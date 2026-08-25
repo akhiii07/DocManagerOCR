@@ -38,6 +38,7 @@ h2 { font-size: 15px; margin: 0 0 4px; text-transform: uppercase;
   margin: 0; padding: 9px 24px; background: #fff8e6;
   border-bottom: 1px solid #f0e0b8; font-size: 13px; color: #6b5316;
 }
+.banner.demo { background: #fdecea; border-bottom-color: #f2c6c0; color: #8c2f22; }
 
 main {
   display: grid; grid-template-columns: minmax(380px, 1fr) minmax(420px, 1.15fr);

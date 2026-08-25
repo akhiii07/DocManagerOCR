@@ -123,9 +123,20 @@ python -m pytest tests -q
 python -m dmocr.web
 ```
 
-Localhost only — there is no authentication (ADR-0002), so the network boundary is the
-control. Upload boxes per document type, a three-outcome type check, case-level findings,
-and click-a-field-to-see-the-region-on-the-page.
+Localhost by default. Upload boxes per document type, a three-outcome type check,
+case-level findings, and click-a-field-to-see-the-region-on-the-page.
+
+To share it through a tunnel:
+
+```bash
+python -m dmocr.web --public                      # generates an access token
+cloudflared tunnel --url http://127.0.0.1:8000    # another terminal
+```
+
+Non-loopback binding is refused **unless a token is configured** — the conditional form of
+the ADR-0002 control: localhost, or authenticated, never neither. Public mode shows a
+demo banner, because a single shared token gives no per-user identity and no revocation.
+**Synthetic fixtures only** — real documents need real auth and a private deployment.
 
 ## Running the corpus survey
 

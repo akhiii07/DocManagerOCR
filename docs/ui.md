@@ -6,8 +6,44 @@
 python -m dmocr.web          # http://127.0.0.1:8000
 ```
 
-**Localhost only.** There is no authentication (ADR-0002), so the network boundary is the
-control. `serve()` refuses to bind to anything but loopback.
+**Localhost by default.** There is no user authentication (ADR-0002), so the network
+boundary is the control.
+
+## Sharing it: the guard is conditional, not removed
+
+The tempting way to share this is to drop the loopback guard — which would leave an
+**unauthenticated document-upload endpoint** exposed. So the guard is conditional instead:
+
+```
+non-loopback binding is allowed ONLY when an access token is configured
+```
+
+Never neither. Four tests pin it.
+
+```bash
+python -m dmocr.web --public                      # generates a token, prints the URL
+cloudflared tunnel --url http://127.0.0.1:8000    # in another terminal
+```
+
+Share `https://<name>.trycloudflare.com/?token=<token>`. The first request swaps the
+token for an `HttpOnly` cookie and redirects to a clean URL, so the secret stops travelling
+in the address bar and referrer headers.
+
+Access is enforced by **middleware, not a per-route dependency**, so static assets and any
+future endpoint are covered by default — a new route cannot become public by omission.
+Only `/healthz` is open, so a tunnel can probe it without the secret.
+
+### Why this is demo-only, stated plainly
+
+Public mode forces a red banner saying so, because a shared token is not authentication:
+
+- one token means **one identity for everyone** — the audit ledger cannot attribute anything to a person
+- **no revocation** short of restarting with a new token
+- a token in a URL leaks through browser history and shoulder-surfing
+
+Processing still happens **on your machine** — documents never reach a third-party host,
+which is why a tunnel beats any PaaS here. But real collateral documents need real
+authentication (OPEN-ITEMS 13) and a private deployment. Not a tunnel.
 
 ## Layout
 

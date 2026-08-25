@@ -289,18 +289,114 @@ class TestUploadValidation:
 
 
 class TestBinding:
-    def test_serve_refuses_a_non_loopback_host(self):
-        """No authentication (ADR-0002), so the network boundary is the control."""
-        from dmocr.web.app import serve
+    """The ADR-0002 control in its conditional form: localhost, OR authenticated."""
 
-        with pytest.raises(SystemExit, match="refusing to bind"):
-            serve("0.0.0.0", 8000)
+    def test_refuses_a_non_loopback_host_without_a_token(self):
+        from dmocr.web.auth import AccessControl, check_binding
 
-    def test_serve_refuses_a_hostname(self):
-        from dmocr.web.app import serve
+        with pytest.raises(SystemExit, match="without an access token"):
+            check_binding("0.0.0.0", AccessControl())
+
+    def test_refuses_a_hostname_without_a_token(self):
+        from dmocr.web.auth import AccessControl, check_binding
 
         with pytest.raises(SystemExit):
-            serve("example.com", 8000)
+            check_binding("example.com", AccessControl())
+
+    def test_allows_a_non_loopback_host_once_a_token_is_set(self):
+        from dmocr.web.auth import AccessControl, check_binding
+
+        check_binding("0.0.0.0", AccessControl("s3cret"))   # must not raise
+
+    def test_loopback_never_needs_a_token(self):
+        from dmocr.web.auth import AccessControl, check_binding
+
+        check_binding("127.0.0.1", AccessControl())
+
+
+class TestAccessControl:
+    def test_token_comparison_rejects_a_wrong_token(self):
+        from dmocr.web.auth import AccessControl
+
+        access = AccessControl("correct")
+        assert access.matches("correct")
+        assert not access.matches("wrong")
+        assert not access.matches(None)
+
+    def test_disabled_control_matches_nothing(self):
+        from dmocr.web.auth import AccessControl
+
+        assert not AccessControl().enabled
+        assert not AccessControl().matches("anything")
+
+    def test_generated_tokens_are_unique_and_long(self):
+        from dmocr.web.auth import generate_token
+
+        a, b = generate_token(), generate_token()
+        assert a != b and len(a) >= 24
+
+
+@pytest.fixture
+def public_client(monkeypatch):
+    """A client with token access enabled, as in shared/tunnel mode."""
+    from dmocr.web import app as web_app
+
+    session = ReviewSession()
+    monkeypatch.setattr(web_app, "session", session)
+    monkeypatch.setattr(web_app.access, "token", "test-token")
+    monkeypatch.setattr(web_app, "PUBLIC_MODE", True)
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        monkeypatch.setattr(web_app.access, "token", None)
+
+
+class TestTokenAccess:
+    def test_request_without_a_token_is_denied(self, public_client):
+        res = public_client.get("/", follow_redirects=False)
+        assert res.status_code == 401
+        assert "Access required" in res.text
+
+    def test_api_without_a_token_is_denied(self, public_client):
+        """Middleware, not a per-route dependency - a new endpoint cannot leak by
+        omission."""
+        assert public_client.get("/api/state").status_code == 401
+
+    def test_static_assets_are_protected_too(self, public_client):
+        assert public_client.get("/static/app.js").status_code == 401
+
+    def test_token_in_the_url_sets_a_cookie_and_redirects(self, public_client):
+        """The secret stops travelling in the address bar after the first request."""
+        res = public_client.get("/?token=test-token", follow_redirects=False)
+        assert res.status_code == 303
+        assert "token" not in res.headers["location"]
+        cookie = res.headers.get("set-cookie", "")
+        assert "dmocr_access=" in cookie and "HttpOnly" in cookie
+
+    def test_cookie_grants_subsequent_access(self, public_client):
+        public_client.get("/?token=test-token")     # follows the redirect, keeps cookie
+        assert public_client.get("/api/state").is_success
+
+    def test_bearer_header_is_accepted(self, public_client):
+        res = public_client.get(
+            "/api/state", headers={"Authorization": "Bearer test-token"})
+        assert res.is_success
+
+    def test_a_wrong_token_is_denied(self, public_client):
+        assert public_client.get("/?token=nope", follow_redirects=False).status_code == 401
+
+    def test_healthz_is_open_so_tunnels_can_probe_it(self, public_client):
+        res = public_client.get("/healthz")
+        assert res.is_success and res.json() == {"ok": True}
+
+    def test_public_mode_shows_the_demo_banner(self, public_client):
+        html = public_client.get("/?token=test-token").text
+        assert "DEMO INSTANCE" in html
+        assert "do not upload real customer documents" in html.lower()
+
+    def test_localhost_mode_shows_no_demo_banner(self, client):
+        assert "DEMO INSTANCE" not in client.get("/").text
 
 
 class TestServiceUnits:
