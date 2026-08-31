@@ -26,8 +26,9 @@ platform for lending underwriting.
 | **P9** Verification-aware rules | Done — external results become findings. |
 | **P10** Evaluation harness | Done — `src/dmocr/eval/`, metrics that don't reward guessing. |
 | **P12** Review UI | Done — boxes, findings, evidence crops, field accept/correct. |
-| Tests | 563 passing. |
-| Next | Operator task list in the UI; a real labelled corpus |
+| **P13** System view | Done — rules, regulatory, trace, verification, evaluation, open items. |
+| Tests | 599 passing. |
+| Next | A real labelled corpus — the one thing gating every accuracy number |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -123,9 +124,14 @@ python -m pytest tests -q
 python -m dmocr.web
 ```
 
-**Runs on your machine, and stays there.** Upload boxes per document type, a
-three-outcome type check, case-level findings, click-a-field-to-see-the-region-on-the-page,
-and accept/correct per field.
+**Runs on your machine, and stays there.** Two tabs:
+
+- **Review** — upload boxes per document type, a three-outcome type check, case-level
+  findings, click-a-field-to-see-the-region-on-the-page, and accept/correct per field.
+- **System** — a developer view of what the platform is doing *and what it is not doing
+  yet*: all 12 rules with their citations and what each decided, the 21 regulatory
+  requirements with the 3 that are blocked and why, a stage-by-stage pipeline trace, the
+  verification plan and operator tasks, evaluation scores, and the tracked open items.
 
 There is a dormant `--public` token mode (tested, defaults to off) that would allow
 non-loopback binding *only* with an access token — the conditional form of the ADR-0002

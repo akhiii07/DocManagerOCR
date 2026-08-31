@@ -39,6 +39,7 @@ from ..model.provenance import ProcessingContext
 from ..ocr import InMemoryOcrCache, OcrDocument, TextExtractionService, default_engine
 from ..resolve import CaseAssembler
 from ..rules import ExecutionMode, RuleEngine, RuleSet, summarise
+from ..verify import VerificationOrchestrator, VerificationRun
 from .feedback import (
     CorrectionError,
     FeedbackAction,
@@ -147,6 +148,13 @@ class DocumentContext:
     #: human's correction.
     corrections: dict = field(default_factory=dict)
 
+    #: Everything the System view needs to explain what actually happened. Kept here
+    #: rather than recomputed, because a trace of a past run must not change when the
+    #: code does.
+    quality_metrics: dict = field(default_factory=dict)
+    ocr_stats: dict = field(default_factory=dict)
+    classification_detail: dict = field(default_factory=dict)
+
 
 _CONFIDENCE_LABEL = {
     ConfidenceTier.HIGH: "high",
@@ -180,6 +188,12 @@ class ReviewSession:
         self.classifier = RuleClassifier()
         self.extractor = ExtractionService()
         self.assembler = CaseAssembler()
+        # No adapters registered: CERSAI is the only automatable source and it is blocked
+        # on whether the lender holds an entity account (OPEN-ITEMS 7). The orchestrator
+        # still produces the plan and the operator tasks, which is the honest picture and
+        # what the System view shows.
+        self.verifier = VerificationOrchestrator()
+        self.verification: VerificationRun | None = None
 
         self.rule_set: RuleSet | None = None
         try:
@@ -332,6 +346,15 @@ class ReviewSession:
             "Scan quality is poor; confidence is capped."
             if quality is DocumentQuality.DEGRADED else "Readable.",
         ))
+        ctx.quality_metrics = {
+            "verdict": quality.value,
+            "sha256": result.document.sha256[:16],
+            "page_count": result.document.page_count,
+            "has_text_layer": result.document.has_text_layer,
+            "notes": list(result.document.quality_notes),
+            "safety": result.safety.verdict.value,
+            "safety_findings": [f.code for f in result.safety.findings],
+        }
 
         # -- 2. text -------------------------------------------------------------
         ocr_doc, stats = self.text.extract(ctx.data, result.document.sha256)
@@ -346,6 +369,17 @@ class ReviewSession:
             "text", "Reading", StageStatus.OK if not stats.failures else StageStatus.ATTENTION,
             detail + ("; " + "; ".join(stats.failures[:2]) if stats.failures else ""),
         ))
+        ctx.ocr_stats = {
+            "ocr_pages": stats.ocr_pages,
+            "text_layer_pages": stats.text_layer_pages,
+            "empty_pages": stats.empty_pages,
+            "cache_hits": stats.cache_hits,
+            "failures": list(stats.failures),
+            "mean_confidence": ocr_doc.mean_confidence,
+            "page_count": ocr_doc.page_count,
+            "sources": ocr_doc.sources,
+            "engine": self.text.engine.engine_id,
+        }
 
         # -- 3. the box check ----------------------------------------------------
         classification = self.classifier.classify(ocr_doc.page_texts(), quality=quality)
@@ -355,6 +389,22 @@ class ReviewSession:
         stage, detail, suggested = _check_box(expected, classification)
         ctx.suggested_type = suggested
         ctx.stages.append(StageResult("classify", "Document type", stage, detail))
+        ctx.classification_detail = {
+            "predicted": classification.document_type.value,
+            "confidence": classification.confidence.value,
+            "score": round(classification.score, 2),
+            "runner_up": (classification.runner_up.value
+                          if classification.runner_up else None),
+            "unknown_reason": (classification.unknown_reason.value
+                               if classification.unknown_reason else None),
+            # All candidate scores, so a misfire can be diagnosed rather than guessed at.
+            "scores": {k.value: v for k, v in classification.scores.items()},
+            "signals": [
+                {"name": h.signal_name, "page": h.page,
+                 "text": h.matched_text[:60], "weight": h.contribution}
+                for h in classification.hits[:12]
+            ],
+        }
 
         if stage is StageStatus.BLOCKED:
             # The one place gating is correct: a confident type mismatch would otherwise
@@ -472,6 +522,12 @@ class ReviewSession:
         self.case_notes = list(assembly.notes)
         for decision in assembly.decisions:
             self.case_notes.append(str(decision))
+
+        # Runs AFTER assembly, because the planner needs resolved canonical values to know
+        # what to look up. Writes results onto the case so verification-aware rules see
+        # them in the same pass.
+        if self.case.properties:
+            self.verification = self.verifier.run(self.case)
 
         if self.rule_set is None:
             self.findings = []

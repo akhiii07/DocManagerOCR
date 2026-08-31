@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System &middot; Collateral Document Review</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>System</h1>
+    <p class="sub">What the platform is doing &mdash; and what it is not doing yet</p>
+  </div>
+  <div class="header-actions">
+    <nav class="tabs">
+      <a href="/">Review</a>
+      <a href="/system" class="on">System</a>
+    </nav>
+    {% if rules_version %}<span class="pill">rules {{ rules_version }}</span>{% endif %}
+  </div>
+</header>
+
+{% if public_mode %}
+<p class="banner demo"><strong>DEMO INSTANCE</strong> &mdash; synthetic data only.</p>
+{% endif %}
+
+<p class="banner">
+  This is a <strong>developer view</strong>, not the Risk Manager's. It deliberately shows
+  the negative answers too &mdash; blocked requirements, unapproved rules, sources that
+  cannot be automated, and metrics that have not been measured on real documents.
+</p>
+
+<nav class="panelnav">
+  <button class="tab on" data-panel="rules">Rules</button>
+  <button class="tab" data-panel="regulatory">Regulatory</button>
+  <button class="tab" data-panel="trace">Pipeline trace</button>
+  <button class="tab" data-panel="verification">Verification</button>
+  <button class="tab" data-panel="evaluation">Evaluation</button>
+  <button class="tab" data-panel="open-items">Open items</button>
+  <button id="refresh" class="ghost">Refresh</button>
+</nav>
+
+<main class="system">
+  <section id="panel-rules" class="panel"></section>
+  <section id="panel-regulatory" class="panel" hidden></section>
+  <section id="panel-trace" class="panel" hidden></section>
+  <section id="panel-verification" class="panel" hidden></section>
+  <section id="panel-evaluation" class="panel" hidden></section>
+  <section id="panel-open-items" class="panel" hidden></section>
+</main>
+
+<script src="/static/system.js"></script>
+</body>
+</html>

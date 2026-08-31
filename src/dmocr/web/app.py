@@ -24,6 +24,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from . import system
 from ..model.findings import Disposition
 from .auth import AccessControl, AccessMiddleware, check_binding
 from .render import crop_evidence
@@ -63,9 +64,88 @@ def index(request: Request):
     })
 
 
+@app.get("/system", response_class=HTMLResponse)
+def system_page(request: Request):
+    """Developer view: what the system is doing, and what it is not doing yet."""
+    return templates.TemplateResponse(request, "system.html", {
+        "public_mode": PUBLIC_MODE,
+        "rules_version": session.rule_set.version if session.rule_set else None,
+    })
+
+
 @app.get("/healthz")
 def healthz():
     """Open by design, so a tunnel health check does not need the token."""
+    return {"ok": True}
+
+
+# =====================================================================================
+# System view
+# =====================================================================================
+
+
+@app.get("/api/system/rules")
+def system_rules():
+    return system.rules_view(session)
+
+
+@app.get("/api/system/regulatory")
+def system_regulatory():
+    return system.regulatory_view()
+
+
+@app.get("/api/system/trace")
+def system_trace():
+    return system.trace_view(session)
+
+
+@app.get("/api/system/verification")
+def system_verification():
+    return system.verification_view(session)
+
+
+@app.get("/api/system/evaluation")
+def system_evaluation():
+    return {**system.evaluation_view(), "running": _eval_state["running"],
+            "last_error": _eval_state["error"]}
+
+
+@app.get("/api/system/open-items")
+def system_open_items():
+    return system.open_items_view()
+
+
+#: Guarded so two clicks cannot start two runs over the same output directory.
+_eval_state: dict = {"running": False, "error": None}
+
+
+def _run_evaluation() -> None:
+    from ..eval import EvaluationRunner, load_corpus, write_report
+
+    try:
+        corpus = load_corpus(system.REPO_ROOT / "eval/groundtruth")
+        documents = system.REPO_ROOT / "fixtures"
+        if not documents.is_dir():
+            raise FileNotFoundError(
+                "fixtures/ not found - run `python tools/make_fixtures.py fixtures` first")
+        result = EvaluationRunner().run(corpus, documents)
+        write_report(result, system.REPO_ROOT / "eval-output")
+        _eval_state["error"] = None
+    except Exception as exc:  # noqa: BLE001 - surfaced in the UI, not swallowed
+        log.exception("evaluation failed")
+        _eval_state["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        _eval_state["running"] = False
+
+
+@app.post("/api/system/run-evaluation")
+def run_evaluation():
+    """Kick off the harness in the background. It takes tens of seconds."""
+    if _eval_state["running"]:
+        return {"ok": False, "error": "An evaluation is already running."}
+    _eval_state["running"] = True
+    _eval_state["error"] = None
+    threading.Thread(target=_run_evaluation, daemon=True).start()
     return {"ok": True}
 
 
