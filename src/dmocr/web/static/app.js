@@ -134,19 +134,47 @@ function renderBox(b) {
   }
 
   if (b.fields.length) {
-    html += `<div class="fields">` + b.fields.map((f) => {
-      const ev = f.evidence
-        ? `<a class="ev" data-evidence="${esc(f.evidence)}"
-              data-label="${esc(b.label)} — ${esc(f.label)} (page ${f.page})">view on page</a>`
-        : "";
-      const notes = f.notes.map((n) => `<div class="fnote">${esc(n)}</div>`).join("");
-      return `<div class="field"><span class="fname">${esc(f.label)}</span>
-        <span class="fval">${esc(f.value)}</span>
-        <span class="conf ${f.confidence}">${f.confidence}</span>${ev}</div>${notes}`;
-    }).join("") + `</div>`;
+    html += `<div class="fields">` + b.fields.map((f) =>
+      renderField(b, f)).join("") + `</div>`;
   }
 
   box.querySelector(".box-body").innerHTML = html;
+}
+
+// The confirmation step: accept the value, or replace it. A correction becomes a claim
+// asserted by the reviewer and re-runs the case checks.
+function renderField(b, f) {
+  const id = b.document_id;
+  const ev = f.evidence
+    ? `<a class="ev" data-evidence="${esc(f.evidence)}"
+          data-label="${esc(b.label)} — ${esc(f.label)} (page ${f.page})">view on page</a>`
+    : "";
+  const notes = f.notes.map((n) => `<div class="fnote">${esc(n)}</div>`).join("");
+
+  let mark = "";
+  if (f.feedback === "accepted") mark = `<span class="fb ok">✓ accepted</span>`;
+  if (f.feedback === "corrected") mark = `<span class="fb edited">✎ corrected</span>`;
+
+  const actions = f.feedback
+    ? `<button class="ghost tiny" data-edit="${id}|${esc(f.name)}">change</button>`
+    : `<button class="ghost tiny" data-accept="${id}|${esc(f.name)}">accept</button>
+       <button class="ghost tiny" data-edit="${id}|${esc(f.name)}">correct</button>`;
+
+  const was = f.original_value
+    ? `<div class="fnote was">system read: ${esc(f.original_value)}</div>` : "";
+
+  return `<div class="field" data-field="${esc(f.name)}">
+      <span class="fname">${esc(f.label)}</span>
+      <span class="fval">${esc(f.value)}</span>
+      <span class="conf ${f.confidence}">${f.confidence}</span>${mark}${ev}
+      <span class="facts">${actions}</span>
+    </div>${was}${notes}
+    <div class="editrow" data-editrow="${esc(f.name)}" hidden>
+      <input type="text" value="${esc(f.value)}" data-input="${id}|${esc(f.name)}">
+      <button data-save="${id}|${esc(f.name)}">Save</button>
+      <button class="ghost" data-canceledit="${esc(f.name)}">Cancel</button>
+      <div class="editerr"></div>
+    </div>`;
 }
 
 // ---------------------------------------------------------------- findings
@@ -206,6 +234,23 @@ document.addEventListener("click", async (ev) => {
     document.getElementById("evidence").hidden = true;
     return;
   }
+  if (t.dataset.accept) {
+    const [id, field] = t.dataset.accept.split("|");
+    return post("/api/accept-field", { document_id: id, field });
+  }
+  if (t.dataset.edit) {
+    const field = t.dataset.edit.split("|")[1];
+    const row = document.querySelector(`[data-editrow="${CSS.escape(field)}"]`);
+    if (row) { row.hidden = false; row.querySelector("input").focus(); }
+    return;
+  }
+  if (t.dataset.canceledit) {
+    const row = document.querySelector(`[data-editrow="${CSS.escape(t.dataset.canceledit)}"]`);
+    if (row) { row.hidden = true; row.querySelector(".editerr").textContent = ""; }
+    return;
+  }
+  if (t.dataset.save) return saveCorrection(t.dataset.save);
+
   if (t.dataset.confirm) return post("/api/confirm", { document_id: t.dataset.confirm });
   if (t.dataset.move)
     return post("/api/move", { document_id: t.dataset.move, target: t.dataset.target });
@@ -219,6 +264,28 @@ document.addEventListener("click", async (ev) => {
     });
   }
 });
+
+async function saveCorrection(key) {
+  const [id, field] = key.split("|");
+  const row = document.querySelector(`[data-editrow="${CSS.escape(field)}"]`);
+  const input = row.querySelector("input");
+  const err = row.querySelector(".editerr");
+  err.textContent = "";
+
+  const body = new FormData();
+  body.append("document_id", id);
+  body.append("field", field);
+  body.append("value", input.value);
+
+  const res = await fetch("/api/correct-field", { method: "POST", body });
+  if (!res.ok) {
+    // A correction that cannot be read is refused with the reason, not stored as a guess.
+    const data = await res.json().catch(() => ({}));
+    err.textContent = data.error || "Could not save that value.";
+    return;
+  }
+  startPolling();
+}
 
 async function post(url, fields) {
   const body = new FormData();

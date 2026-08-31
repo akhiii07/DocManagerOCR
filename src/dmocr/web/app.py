@@ -128,6 +128,51 @@ def remove(document_id: str = Form(...)):
     return {"ok": True}
 
 
+@app.post("/api/accept-field")
+def accept_field(document_id: str = Form(...), field: str = Form(...)):
+    session.accept_field(document_id, field)
+    return {"ok": True}
+
+
+@app.post("/api/correct-field")
+def correct_field(document_id: str = Form(...), field: str = Form(...),
+                  value: str = Form(...)):
+    """Replace an extracted value with the reviewer's.
+
+    A correction that cannot be read is refused with the reason rather than stored as a
+    guess - putting a wrong value into the case under a human's authority would be worse
+    than the extraction error being corrected.
+    """
+    from .feedback import CorrectionError
+
+    try:
+        session.correct_field(document_id, field, value)
+    except CorrectionError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    return {"ok": True}
+
+
+@app.get("/api/feedback")
+def feedback():
+    """Reviewer decisions, and the correction rate by claimed confidence.
+
+    The calibration question in one place: when the system said HIGH, how often was it
+    wrong?
+    """
+    log = session.feedback
+    return {
+        "decisions": len(log),
+        "corrections": len(log.corrections()),
+        "by_confidence": log.calibration_summary(),
+        "history": [
+            {"document_id": e.document_id, "field": e.field_name,
+             "action": e.action.value, "original_confidence": e.original_confidence,
+             "at": e.at.isoformat(timespec="seconds")}
+            for e in log.history
+        ],
+    }
+
+
 @app.post("/api/reset")
 def reset():
     session.reset()

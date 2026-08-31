@@ -261,7 +261,34 @@ class Money(BaseModel):
         return Decimal(self.paise) / _PAISE_PER_RUPEE
 
     def __str__(self) -> str:
-        return f"{self.currency} {self.rupees:,.2f}"
+        return f"{self.currency} {format_indian(self.rupees)}"
+
+
+def format_indian(amount: Decimal) -> str:
+    """Format with Indian digit grouping: 1,25,00,000.00, not 12,500,000.00.
+
+    Python's `:,` gives Western thousands grouping. Displaying an Indian lending amount
+    that way is a small thing that reads as wrong to anyone who works with these figures
+    daily - and we already go to some trouble to PARSE Indian grouping, so showing it
+    back in the other convention is inconsistent as well as jarring.
+
+    Last group is three digits, everything above it in twos.
+    """
+    quantised = amount.quantize(Decimal("0.01"))
+    sign = "-" if quantised < 0 else ""
+    whole, _, frac = f"{abs(quantised):.2f}".partition(".")
+
+    if len(whole) <= 3:
+        return f"{sign}{whole}.{frac}"
+
+    last3, rest = whole[-3:], whole[:-3]
+    groups = []
+    while len(rest) > 2:
+        groups.insert(0, rest[-2:])
+        rest = rest[:-2]
+    if rest:
+        groups.insert(0, rest)
+    return f"{sign}{','.join([*groups, last3])}.{frac}"
 
 
 # =====================================================================================

@@ -103,8 +103,24 @@ section { background: var(--panel); border: 1px solid var(--line);
 .conf { font-size: 11px; border-radius: 8px; padding: 0 6px; border: 1px solid var(--line);
         color: var(--muted); }
 .conf.low, .conf.insufficient { color: var(--attention); border-color: #e6d3ae; }
-.field a.ev { margin-left: auto; font-size: 12px; color: var(--accent); cursor: pointer; }
+.field a.ev { font-size: 12px; color: var(--accent); cursor: pointer; }
 .fnote { font-size: 12px; color: var(--attention); padding: 0 0 6px 126px; }
+.fnote.was { color: var(--muted); }
+
+.conf.confirmed { color: var(--ok); border-color: #bfe0cd; }
+.fb { font-size: 11px; }
+.fb.ok { color: var(--ok); }
+.fb.edited { color: var(--accent); }
+
+.facts { margin-left: auto; display: flex; gap: 4px; flex: none; }
+button.tiny { padding: 1px 7px; font-size: 12px; }
+
+.editrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+           padding: 6px 0 8px 126px; }
+.editrow input { font: inherit; font-size: 13px; padding: 4px 7px; flex: 1 1 160px;
+                 border: 1px solid var(--line); border-radius: 5px; }
+.editrow input:focus { outline: none; border-color: var(--accent); }
+.editerr { flex-basis: 100%; font-size: 12px; color: var(--blocker); }
 
 /* ---------------- issues / actions ---------------- */
 .issues { margin: 10px 0 0; padding: 9px 10px; background: #fdf6ec;

@@ -39,6 +39,13 @@ from ..model.provenance import ProcessingContext
 from ..ocr import InMemoryOcrCache, OcrDocument, TextExtractionService, default_engine
 from ..resolve import CaseAssembler
 from ..rules import ExecutionMode, RuleEngine, RuleSet, summarise
+from .feedback import (
+    CorrectionError,
+    FeedbackAction,
+    FeedbackLog,
+    FieldFeedback,
+    parse_correction,
+)
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +103,11 @@ class FieldView:
     #: Present when the value can be shown on the page.
     evidence: str | None = None
     notes: list[str] = field(default_factory=list)
+    #: None until a reviewer decides: "accepted" or "corrected".
+    feedback: str | None = None
+    #: What the system originally produced, kept visible after a correction so the
+    #: reviewer can see what they changed.
+    original_value: str | None = None
 
 
 @dataclass
@@ -130,6 +142,10 @@ class DocumentContext:
     issues: list[str] = field(default_factory=list)
     status: BoxStatus = BoxStatus.PROCESSING
     suggested_type: DocumentType | None = None
+    #: field name -> reviewer-corrected value. Applied on every recompute rather than
+    #: written into the extraction, so re-running the pipeline never silently discards a
+    #: human's correction.
+    corrections: dict = field(default_factory=dict)
 
 
 _CONFIDENCE_LABEL = {
@@ -175,6 +191,8 @@ class ReviewSession:
         self.findings: list[Finding] = []
         self.finding_summary: dict = {}
         self.case_notes: list[str] = []
+        #: Reviewer decisions. Also the calibration dataset - see feedback.py.
+        self.feedback = FeedbackLog()
         self._new_case()
 
     # -- case --------------------------------------------------------------------
@@ -200,7 +218,59 @@ class ReviewSession:
             self.findings.clear()
             self.finding_summary = {}
             self.case_notes.clear()
+            self.feedback.clear()
             self._new_case()
+
+    # -- reviewer feedback -------------------------------------------------------
+
+    def accept_field(self, document_id: str, field_name: str) -> None:
+        """Reviewer confirms the extracted value is right."""
+        found = self._find_field(document_id, field_name)
+        if found is None:
+            return
+        ctx, extracted = found
+        self.feedback.record(FieldFeedback(
+            document_id=document_id,
+            field_name=field_name,
+            action=FeedbackAction.ACCEPTED,
+            original_value=_display_value(extracted),
+            original_confidence=_CONFIDENCE_LABEL.get(extracted.confidence, "unknown"),
+        ))
+        # No recompute needed: accepting does not change the value, only its standing.
+
+    def correct_field(self, document_id: str, field_name: str, text: str) -> None:
+        """Reviewer replaces the extracted value.
+
+        Raises CorrectionError if the text cannot be read as the right kind of value -
+        the UI shows that back rather than storing a guess.
+        """
+        found = self._find_field(document_id, field_name)
+        if found is None:
+            raise CorrectionError("That field is no longer on the case.")
+        ctx, extracted = found
+
+        # Raises before anything is recorded, so a rejected correction leaves no trace.
+        new_value = parse_correction(extracted.value, text)
+
+        self.feedback.record(FieldFeedback(
+            document_id=document_id,
+            field_name=field_name,
+            action=FeedbackAction.CORRECTED,
+            original_value=_display_value(extracted),
+            original_confidence=_CONFIDENCE_LABEL.get(extracted.confidence, "unknown"),
+            corrected_value=text.strip(),
+        ))
+        ctx.corrections[field_name] = new_value
+        # A correction changes the facts, so cross-document checks must run again.
+        self._recompute_case()
+
+    def _find_field(self, document_id: str, field_name: str):
+        ctx = self.documents.get(document_id)
+        if ctx is None or ctx.extraction is None:
+            return None
+        extracted = next(
+            (f for f in ctx.extraction.fields if f.field_name == field_name), None)
+        return (ctx, extracted) if extracted is not None else None
 
     # -- upload ------------------------------------------------------------------
 
@@ -391,7 +461,7 @@ class ReviewSession:
         would hide the cross-document conflicts that are the most valuable thing here.
         """
         extractions = {
-            ctx.document.document_id: ctx.extraction
+            ctx.document.document_id: _with_corrections(ctx)
             for ctx in self.documents.values()
             if ctx.document is not None and ctx.extraction is not None
         }
@@ -443,16 +513,27 @@ class ReviewSession:
         for f in ctx.extraction.fields:
             prov = f.provenance
             has_box = getattr(prov, "bbox", None) is not None
+            decision = self.feedback.get(ctx.document_id, f.field_name)
+            corrected = ctx.corrections.get(f.field_name)
+
             out.append(FieldView(
                 name=f.field_name,
                 label=f.field_name.replace("_", " ").title(),
-                value=_display_value(f),
-                confidence=_CONFIDENCE_LABEL.get(f.confidence, "unknown"),
+                # Show the corrected value where there is one - the reviewer's answer is
+                # the one the case now runs on.
+                value=(_display_claim_value(corrected) if corrected is not None
+                       else _display_value(f)),
+                confidence=("confirmed" if corrected is not None
+                            else _CONFIDENCE_LABEL.get(f.confidence, "unknown")),
                 page=prov.page,
+                # Evidence still points at the ORIGINAL region, so a reviewer can check
+                # what the system read even after overriding it.
                 evidence=(f"/evidence/{ctx.document_id}/{prov.page}"
                           f"?x0={prov.bbox.x0}&y0={prov.bbox.y0}"
                           f"&x1={prov.bbox.x1}&y1={prov.bbox.y1}") if has_box else None,
                 notes=list(f.notes),
+                feedback=decision.action.value if decision else None,
+                original_value=(_display_value(f) if corrected is not None else None),
             ))
         return out
 
@@ -517,6 +598,59 @@ def _check_box(
         f"nothing further was read.",
         got,
     )
+
+
+def _with_corrections(ctx: DocumentContext):
+    """The document's extraction with reviewer corrections applied.
+
+    A correction becomes a field carrying `HumanProvenance`, so downstream it is a claim
+    asserted by a person rather than read from the page. Two consequences that matter:
+    the claim is legitimately ungrounded (ADR-0004 constrains the MODEL, not the reviewer),
+    and the audit shows who said it.
+    """
+    from dataclasses import replace
+
+    if ctx.extraction is None or not ctx.corrections:
+        return ctx.extraction
+
+    from ..model.common import ConfidenceTier as _Tier
+    from ..model.provenance import HumanProvenance
+
+    fields = []
+    for f in ctx.extraction.fields:
+        new_value = ctx.corrections.get(f.field_name)
+        if new_value is None:
+            fields.append(f)
+            continue
+        fields.append(replace(
+            f,
+            value=new_value,
+            provenance=HumanProvenance(
+                actor="local-operator",
+                asserted_at=datetime.now(),
+                rationale=f"Reviewer corrected {f.field_name}.",
+            ),
+            confidence=_Tier.HIGH,
+            notes=[*f.notes, "Value corrected by the reviewer."],
+        ))
+    return replace(ctx.extraction, fields=fields)
+
+
+def _display_claim_value(v) -> str:
+    from ..model.claims import AreaValue, DateValue, MoneyValue, ParcelValue, TextValue
+
+    if isinstance(v, MoneyValue):
+        return str(v.amount)
+    if isinstance(v, AreaValue):
+        basis = "" if v.basis == "unspecified" else f" ({v.basis.replace('_', ' ')})"
+        return f"{v.area}{basis}"
+    if isinstance(v, DateValue):
+        return v.value.isoformat()
+    if isinstance(v, ParcelValue):
+        return f"{v.identifier.id_type.value.upper()} {v.identifier.value}"
+    if isinstance(v, TextValue):
+        return v.raw
+    return str(v.comparable())
 
 
 def _display_value(f) -> str:

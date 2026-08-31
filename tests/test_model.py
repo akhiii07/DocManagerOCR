@@ -75,6 +75,20 @@ class TestMoney:
         with pytest.raises(Exception):
             Money(paise=-1)
 
+    @pytest.mark.parametrize("rupees,expected", [
+        ("12500000", "1,25,00,000.00"),      # one crore twenty-five lakh
+        ("990000", "9,90,000.00"),
+        ("100000", "1,00,000.00"),
+        ("1000", "1,000.00"),
+        ("999", "999.00"),
+        ("0", "0.00"),
+        ("1234567890", "1,23,45,67,890.00"),
+    ])
+    def test_indian_digit_grouping_on_display(self, rupees, expected):
+        """Two-two-three, not Western thousands. We parse Indian grouping, so showing it
+        back in the other convention would be inconsistent as well as jarring."""
+        assert str(Money.from_rupees(rupees)) == f"INR {expected}"
+
 
 # =====================================================================================
 # Area - conversion, tolerance, and measurement basis

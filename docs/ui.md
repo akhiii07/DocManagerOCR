@@ -132,11 +132,45 @@ CPU, so a synchronous POST would hang the browser on a forty-page deed.
 FastAPI + Jinja + plain JavaScript. No build step, no npm, no CDN — everything served
 locally, which the privacy constraint requires regardless.
 
+## Field confirmation
+
+Each extracted field carries **accept** and **correct**. This is the "data confirmation"
+step, and it does more than tidy the display — it is the only ground truth the system will
+ever generate from real use, and therefore the input to confidence calibration.
+
+**A correction is a new claim, not an edit.** Claims are immutable (ADR-0003), so a
+correction becomes a claim with `HumanProvenance` and the original stays in the feedback
+log. A human claim is legitimately **ungrounded**: ADR-0004 constrains what the *model* may
+assert, not what a reviewer may. The provenance kind records which it was.
+
+Corrections **flow into the case checks**. Correcting the deed's area to agree with the tax
+bill clears the cross-document conflict — there's a test for exactly that round trip.
+
+Three details that matter:
+
+- **Evidence still points at what the system read**, even after an override, so a reviewer
+  can check the original.
+- **Correcting an area keeps its measurement basis.** Otherwise correcting a number would
+  silently drop "carpet" and make the value incomparable with the other documents.
+- **An unreadable correction is refused with the reason**, never stored as a guess. A wrong
+  value carrying a human's authority is worse than the extraction error being corrected,
+  and a refused correction leaves no trace in the log.
+
+### The calibration signal
+
+`GET /api/feedback` reports the **correction rate by the confidence the system claimed**:
+
+```json
+{"by_confidence": {"high": {"accepted": 8, "corrected": 2, "correction_rate": 0.2}}}
+```
+
+That is the calibration question in one line — *when the system said HIGH, how often was it
+wrong?* The outcome alone says nothing; it is only meaningful against the confidence that
+was asserted. History is append-only, so changing your mind doesn't erase that you decided
+otherwise first.
+
 ## Not yet built
 
-- **Per-field accept/correct.** Fields show value, confidence and evidence; the
-  accept-or-correct interaction is the next pass. It's also the feedback signal for
-  confidence calibration, so it matters beyond the UI.
 - **Operator task list** for T4/T5 external verification.
 - **Multi-case and persistence** — the session is single-case and in-memory.
 - Side-by-side full document viewer.

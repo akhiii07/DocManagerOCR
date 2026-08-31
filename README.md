@@ -25,9 +25,9 @@ platform for lending underwriting.
 | **P8** Verification orchestrator | Done — `src/dmocr/verify/`, planner + T4 task queue. |
 | **P9** Verification-aware rules | Done — external results become findings. |
 | **P10** Evaluation harness | Done — `src/dmocr/eval/`, metrics that don't reward guessing. |
-| **P12** Review UI | Done — `src/dmocr/web/`, upload boxes + findings + evidence crops. |
-| Tests | 523 passing. |
-| Next | Per-field accept/correct, operator task list |
+| **P12** Review UI | Done — boxes, findings, evidence crops, field accept/correct. |
+| Tests | 563 passing. |
+| Next | Operator task list in the UI; a real labelled corpus |
 
 Deferred items are tracked in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
@@ -123,20 +123,15 @@ python -m pytest tests -q
 python -m dmocr.web
 ```
 
-Localhost by default. Upload boxes per document type, a three-outcome type check,
-case-level findings, and click-a-field-to-see-the-region-on-the-page.
+**Runs on your machine, and stays there.** Upload boxes per document type, a
+three-outcome type check, case-level findings, click-a-field-to-see-the-region-on-the-page,
+and accept/correct per field.
 
-To share it through a tunnel:
-
-```bash
-python -m dmocr.web --public                      # generates an access token
-cloudflared tunnel --url http://127.0.0.1:8000    # another terminal
-```
-
-Non-loopback binding is refused **unless a token is configured** — the conditional form of
-the ADR-0002 control: localhost, or authenticated, never neither. Public mode shows a
-demo banner, because a single shared token gives no per-user identity and no revocation.
-**Synthetic fixtures only** — real documents need real auth and a private deployment.
+There is a dormant `--public` token mode (tested, defaults to off) that would allow
+non-loopback binding *only* with an access token — the conditional form of the ADR-0002
+control: localhost, or authenticated, never neither. **It is not in use.** This platform
+handles collateral documents containing PII and financial data; the running system is not
+exposed beyond the local machine.
 
 ## Running the corpus survey
 

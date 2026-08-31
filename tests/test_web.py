@@ -275,6 +275,192 @@ class TestFieldsAndEvidence:
 # =====================================================================================
 
 
+class TestFieldConfirmation:
+    """The confirmation step: accept a value, or correct it.
+
+    Also the only ground truth the system will ever generate from real use, which is why
+    the log records the ORIGINAL confidence alongside the outcome.
+    """
+
+    def _first_field(self, client, bundle_dir: Path):
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        box = box_state(client, "sale_deed")
+        return box["document_id"], box["fields"]
+
+    def test_fields_start_with_no_decision(self, client, bundle_dir: Path):
+        _, fields = self._first_field(client, bundle_dir)
+        assert all(f["feedback"] is None for f in fields)
+
+    def test_accepting_records_the_decision(self, client, bundle_dir: Path):
+        doc_id, fields = self._first_field(client, bundle_dir)
+        name = fields[0]["name"]
+        assert client.post("/api/accept-field",
+                           data={"document_id": doc_id, "field": name}).is_success
+
+        after = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == name)
+        assert after["feedback"] == "accepted"
+
+    def test_accepting_does_not_change_the_value(self, client, bundle_dir: Path):
+        doc_id, fields = self._first_field(client, bundle_dir)
+        field = next(f for f in fields if f["name"] == "consideration")
+        client.post("/api/accept-field",
+                    data={"document_id": doc_id, "field": "consideration"})
+        after = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "consideration")
+        assert after["value"] == field["value"]
+
+    def test_correcting_replaces_the_value_and_keeps_the_original(
+        self, client, bundle_dir: Path
+    ):
+        doc_id, _ = self._first_field(client, bundle_dir)
+        res = client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "9900000"})
+        assert res.is_success
+
+        field = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "consideration")
+        assert "99,00,000" in field["value"]      # Indian grouping, not 9,900,000
+        assert field["feedback"] == "corrected"
+        # The system's original reading stays visible.
+        assert field["original_value"] is not None
+        assert "1,25,00,000" in field["original_value"]
+
+    def test_corrected_value_is_marked_confirmed_not_re_scored(
+        self, client, bundle_dir: Path
+    ):
+        doc_id, _ = self._first_field(client, bundle_dir)
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "9900000"})
+        field = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "consideration")
+        assert field["confidence"] == "confirmed"
+
+    def test_evidence_still_points_at_what_the_system_read(self, client, bundle_dir):
+        """A reviewer must be able to check the original after overriding it."""
+        doc_id, _ = self._first_field(client, bundle_dir)
+        before = next(f for f in box_state(client, "sale_deed")["fields"]
+                      if f["name"] == "consideration")["evidence"]
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "9900000"})
+        after = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "consideration")["evidence"]
+        assert after == before
+
+    def test_correction_flows_into_cross_document_checks(self, client, bundle_dir: Path):
+        """Correcting the area to agree with the tax bill must clear the conflict."""
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        upload(client, "property_tax", bundle_dir / "bundle_property_tax.pdf")
+
+        findings = client.get("/api/state").json()["findings"]
+        assert next(f for f in findings
+                    if f["rule_id"] == "XDOC_AREA_001")["determination"] == "MISMATCH"
+
+        doc_id = box_state(client, "sale_deed")["document_id"]
+        res = client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "area", "value": "980 sq ft"})
+        assert res.is_success
+
+        findings = client.get("/api/state").json()["findings"]
+        area = next(f for f in findings if f["rule_id"] == "XDOC_AREA_001")
+        assert area["determination"] != "MISMATCH"
+
+    @pytest.mark.parametrize("field,value,fragment", [
+        ("consideration", "not a number", "amount"),
+        ("execution_date", "the fourteenth", "date"),
+        ("area", "1150", "unit"),
+    ])
+    def test_unreadable_correction_is_refused_with_a_reason(
+        self, client, bundle_dir: Path, field, value, fragment
+    ):
+        """Refuse rather than guess - a wrong value under a human's authority is worse
+        than the extraction error being corrected."""
+        doc_id, _ = self._first_field(client, bundle_dir)
+        res = client.post("/api/correct-field",
+                          data={"document_id": doc_id, "field": field, "value": value})
+        assert res.status_code == 400
+        assert fragment in res.json()["error"].lower()
+
+    def test_refused_correction_leaves_no_trace(self, client, bundle_dir: Path):
+        doc_id, _ = self._first_field(client, bundle_dir)
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "rubbish"})
+        field = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "consideration")
+        assert field["feedback"] is None
+        assert client.get("/api/feedback").json()["decisions"] == 0
+
+    def test_empty_correction_is_refused(self, client, bundle_dir: Path):
+        doc_id, _ = self._first_field(client, bundle_dir)
+        res = client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "   "})
+        assert res.status_code == 400
+
+    def test_correcting_an_area_keeps_its_measurement_basis(self, client, bundle_dir):
+        """Otherwise correcting a number silently drops 'carpet' and makes the value
+        incomparable with the other documents."""
+        doc_id, _ = self._first_field(client, bundle_dir)
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "area", "value": "1200 sq ft"})
+        field = next(f for f in box_state(client, "sale_deed")["fields"]
+                     if f["name"] == "area")
+        assert "carpet" in field["value"]
+
+
+class TestFeedbackLog:
+    def test_log_records_the_original_confidence(self, client, bundle_dir: Path):
+        """The calibration signal: the outcome alone says nothing about whether the
+        confidence was earned."""
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        box = box_state(client, "sale_deed")
+        client.post("/api/accept-field", data={
+            "document_id": box["document_id"], "field": box["fields"][0]["name"]})
+
+        log = client.get("/api/feedback").json()
+        assert log["decisions"] == 1
+        assert log["history"][0]["original_confidence"]
+        assert log["by_confidence"]
+
+    def test_correction_rate_is_reported_by_confidence(self, client, bundle_dir: Path):
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        doc_id = box_state(client, "sale_deed")["document_id"]
+        client.post("/api/accept-field",
+                    data={"document_id": doc_id, "field": "cts_number"})
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "9900000"})
+
+        buckets = client.get("/api/feedback").json()["by_confidence"]
+        assert any(b.get("correction_rate") is not None for b in buckets.values())
+
+    def test_history_is_append_only(self, client, bundle_dir: Path):
+        """Changing your mind must not erase that you decided otherwise first."""
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        doc_id = box_state(client, "sale_deed")["document_id"]
+        client.post("/api/accept-field",
+                    data={"document_id": doc_id, "field": "consideration"})
+        client.post("/api/correct-field", data={
+            "document_id": doc_id, "field": "consideration", "value": "9900000"})
+
+        log = client.get("/api/feedback").json()
+        assert log["decisions"] == 1        # current state
+        assert len(log["history"]) == 2     # both decisions retained
+
+    def test_reset_clears_feedback(self, client, bundle_dir: Path):
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        doc_id = box_state(client, "sale_deed")["document_id"]
+        client.post("/api/accept-field",
+                    data={"document_id": doc_id, "field": "consideration"})
+        client.post("/api/reset")
+        assert client.get("/api/feedback").json()["decisions"] == 0
+
+    def test_unknown_field_is_ignored_not_crashed(self, client, bundle_dir: Path):
+        upload(client, "sale_deed", bundle_dir / "bundle_sale_deed.pdf")
+        doc_id = box_state(client, "sale_deed")["document_id"]
+        assert client.post("/api/accept-field", data={
+            "document_id": doc_id, "field": "no_such_field"}).is_success
+        assert client.get("/api/feedback").json()["decisions"] == 0
+
+
 class TestUploadValidation:
     def test_unknown_box_is_rejected(self, client, bundle_dir: Path):
         with (bundle_dir / "bundle_sale_deed.pdf").open("rb") as fh:
